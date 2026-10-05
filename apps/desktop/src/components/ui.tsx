@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type ButtonHTMLAttributes,
+  type HTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
   type Ref,
@@ -827,15 +828,14 @@ export function Badge({
   children,
   tone = "neutral",
   className,
-  style,
-}: {
+  ...rest
+}: HTMLAttributes<HTMLSpanElement> & {
   children: ReactNode;
   tone?: "neutral" | "success" | "error" | "warning";
-  className?: string;
-  style?: React.CSSProperties;
 }) {
   return (
     <span
+      {...rest}
       className={cx(
         "badge",
         tone === "neutral" && "badge-neutral",
@@ -844,7 +844,6 @@ export function Badge({
         tone === "warning" && "badge-warning",
         className,
       )}
-      style={style}
     >
       {children}
     </span>

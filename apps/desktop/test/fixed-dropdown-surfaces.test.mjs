@@ -17,7 +17,8 @@ const anchoredSurfaceSources = await Promise.all(
     "../src/components/extensions/ScopeControl.tsx",
     readComposerSource(),
     "../src/components/ComposerAutocomplete.tsx",
-    "../src/components/PlanApprovalBar.tsx",
+    "../src/components/plan/PlanBuildControls.tsx",
+    "../src/components/plan/PlanStepsEditor.tsx",
     "../src/components/HomeProjectSwitcher.tsx",
   ].map((source) =>
     typeof source === "string" && source.startsWith("../")
@@ -45,6 +46,7 @@ const dropdownSurfaces = [
   "composer-permission-menu",
   "composer-model-menu",
   "plan-approval-menu",
+  "plan-step-deps-menu",
   "composer-autocomplete",
   "context-inspector-popover",
   "home-project-switcher-menu",

@@ -1,9 +1,12 @@
+import type { PlanProposal } from "@pi-desktop/shared";
+
 export type WorkPanelTabKind =
   | "new"
   | "review"
   | "file"
   | "plugin"
-  | "subagent";
+  | "subagent"
+  | "plan";
 
 export type WorkPanelTab = {
   id: string;
@@ -88,7 +91,7 @@ export function switchWorkPanelContextState(
 }
 
 export function toolWorkPanelTab(
-  kind: Exclude<WorkPanelTabKind, "new" | "file" | "plugin" | "subagent">,
+  kind: Exclude<WorkPanelTabKind, "new" | "file" | "plugin" | "subagent" | "plan">,
 ): WorkPanelTab {
   return { id: kind, kind };
 }
@@ -137,6 +140,10 @@ export function subagentWorkPanelTab(
     resource: delegationId,
     ...(agentName ? { label: agentName } : {}),
   };
+}
+
+export function planWorkPanelTab(proposal: Pick<PlanProposal, "id" | "title">): WorkPanelTab {
+  return { id: `plan:${proposal.id}`, kind: "plan", resource: proposal.id, label: proposal.title };
 }
 
 export const BROWSER_PLUGIN_TAB = {
@@ -233,7 +240,7 @@ export function isKnownWorkPanelTab(tab: WorkPanelTab): boolean {
     Boolean(tab) &&
     (tab.kind === "new" || tab.kind === "review" ||
       tab.kind === "file" || tab.kind === "plugin" ||
-      tab.kind === "subagent")
+      tab.kind === "subagent" || tab.kind === "plan")
   );
 }
 

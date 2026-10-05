@@ -4,7 +4,7 @@ import type { PlanProposal, UiMessage } from "@pi-desktop/shared";
 import { Badge, Button, Panel } from "../../../components/ui";
 import { Markdown } from "../../../components/Markdown";
 import { useAppStore } from "../../../stores/app-store";
-import { preferredFileWorkPanelTab } from "../../../lib/work-panel-tabs";
+import { planWorkPanelTab, preferredFileWorkPanelTab } from "../../../lib/work-panel-tabs";
 import { useSlotSessionId } from "../../../plugins/renderer-slots/use-slots";
 import { disclosureKey, useAutomaticDisclosure } from "./disclosure";
 import { useMessageRevealRequest } from "./shared";
@@ -36,6 +36,11 @@ export function PlanHistoryCard({ message, proposal, autoOpen = false, onUserInt
         {t(`planHistory.${statusKey}`)}
       </Badge>
       {message.planHistory?.superseded && <Badge>{t("planHistory.superseded")}</Badge>}
+      {proposal.kind !== "goal" && message.toolName === "SubmitPlan" && <Button variant="ghost" size="sm"
+        className="plan-history-view-plan" data-testid="plan-tool-view-plan"
+        onClick={() => { onUserInteraction?.(); openTab(sessionId, planWorkPanelTab(proposal)); }}>
+        {t("plan.viewPlan")}
+      </Button>}
     </div>
     {path && <Button variant="ghost" className="plan-history-artifact"
       aria-label={t(`${kind}.openArtifactLabel`, { path })}

@@ -10,12 +10,14 @@ import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { desktopPaths, repositoryRoot, resolveElectronBinary } from "./e2e/boot.mjs";
 import { resolveHostBinary } from "./e2e/host.mjs";
+import { runInteractivePlanCase } from "./e2e/plan-ui-interactive.mjs";
 
 const root = repositoryRoot();
 const { appDir } = desktopPaths(root);
 
 const REQUIRED_CASE_IDS = [
   "E2E-106-renderer",
+  "E2E-PLAN-interactive-tab-edit-build-progress",
   "E2E-111-renderer",
   "E2E-117-en",
   "E2E-117-zh-CN",
@@ -1604,6 +1606,27 @@ async function runAcceptance(state) {
     true,
     "zh-CN labels, Ask default, terminal Agent state, pending-only reload hydration, and no stale actions verified",
   );
+
+  // E2E-PLAN-interactive-tab-edit-build-progress runs on its own session, in
+  // English, after the zh-CN terminal assertions: the interactive Plan tab
+  // needs en labels.
+  const interactiveHelpers = {
+    waitFor,
+    clickSelector,
+    inspectUi,
+    captureScreenshot,
+    runPlanProbe,
+    getPreloadResult,
+    setLanguage,
+    reloadRenderer,
+    selectSession,
+    getSession,
+    settlePlanProbe,
+    classifyExpectedDiagnostic,
+    jsonText,
+    record,
+  };
+  await runInteractivePlanCase(state, interactiveHelpers);
 
   if (!LIVE_ENV_AVAILABLE) {
     console.log(

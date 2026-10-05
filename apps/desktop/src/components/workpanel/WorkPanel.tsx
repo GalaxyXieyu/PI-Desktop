@@ -39,6 +39,7 @@ import {
   IconPlug,
   IconPlus,
 } from "../icons";
+import { PlanTab } from "./PlanTab";
 import { ReviewTab } from "./ReviewTab";
 import { FilesTab } from "./FilesTab";
 import { PluginViewTab } from "./PluginViewTab";
@@ -58,6 +59,7 @@ const TAB_ICONS = {
   review: IconDiff,
   file: IconFileText,
   plugin: IconPlug,
+  plan: IconFileText,
   subagent: IconBot,
 } as const;
 
@@ -111,6 +113,7 @@ function tabLabel(
     // back to its id rather than leaving the tab blank until it closes.
     return view?.title ?? tab.resource ?? t("panel.tabs.plugin");
   }
+  if (tab.kind === "plan") return tab.label ?? t("plan.document");
   if (tab.kind === "new") return t("panel.new.title");
   if (tab.kind === "subagent") return tab.label ?? t("panel.tabs.subagent");
   if (tab.kind !== "file") return t(`panel.tabs.${tab.kind}`);
@@ -903,6 +906,17 @@ export function WorkPanel({
           </div>
         </header>
         <div className="work-panel-body">
+          {activeTab?.kind === "plan" && activeSessionId && (
+            <div
+              key={`${activeSessionId}:${activeTab.id}`}
+              id={`work-panel-surface-${activeTab.id}`}
+              className="work-panel-tabpane"
+              role="tabpanel"
+              aria-labelledby={`work-panel-tab-${activeTab.id}`}
+            >
+              <PlanTab sessionId={activeSessionId} proposalId={activeTab.resource ?? ""} />
+            </div>
+          )}
           {activeTab?.kind === "subagent" && (
             <div
               key={activeTab.id}

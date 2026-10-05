@@ -15,6 +15,7 @@ const {
   normalizeWorkPanelFilePath,
   newWorkPanelTab,
   openWorkPanelTabState,
+  planWorkPanelTab,
   pluginWorkPanelTab,
   preferredFileWorkPanelTab,
   replaceWorkPanelTabState,
@@ -25,6 +26,25 @@ const {
   switchWorkPanelContextState,
   toolWorkPanelTab,
 } = await import("../src/lib/work-panel-tabs.ts");
+
+test("plan tabs deduplicate, reorder, sanitize and survive a session round trip", () => {
+  const plan = planWorkPanelTab({ id: "proposal-1", title: "Build the page" });
+  assert.deepEqual(plan, { id: "plan:proposal-1", kind: "plan", resource: "proposal-1", label: "Build the page" });
+  assert.equal(isKnownWorkPanelTab(plan), true);
+  assert.equal(isToolWorkPanelTab(plan), false);
+  assert.equal(createWorkPanelFileRequest(plan, 1), null);
+  let state = openWorkPanelTabState({ tabs: [], activeTabId: null }, plan);
+  state = openWorkPanelTabState(state, plan);
+  assert.equal(state.tabs.length, 1);
+  state = openWorkPanelTabState(state, subagentWorkPanelTab("delegate"));
+  state = reorderWorkPanelTabsState(state, plan.id, "subagent:delegate", true);
+  assert.deepEqual(state.tabs.map((tab) => tab.kind), ["subagent", "plan"]);
+  assert.deepEqual(sanitizeWorkPanelTabsState(state), state);
+  const context = { ...state, open: true, fileRequest: null };
+  const away = switchWorkPanelContextState({}, "session-1", context, "session-2");
+  const back = switchWorkPanelContextState(away.contexts, "session-2", away.visible, "session-1");
+  assert.deepEqual(back.visible, context);
+});
 
 test("work panel tabs open on demand and deduplicate by resource", () => {
   const empty = { tabs: [], activeTabId: null };

@@ -14,9 +14,10 @@ const readDesktop = (relativePath) =>
 const readPackage = (relativePath) =>
   readFile(new URL(`../../../packages/i18n/${relativePath}`, import.meta.url), "utf8");
 
-const [approvalBar, approvalPreferences, apiSource, storeSource, settingsPage, settingsSearch, styles, english, chinese, planStateSource, composerSource] =
+const [approvalBar, approvalControls, approvalPreferences, apiSource, storeSource, settingsPage, settingsSearch, styles, english, chinese, planStateSource, composerSource] =
   await Promise.all([
     readDesktop("src/components/PlanApprovalBar.tsx"),
+    readDesktop("src/components/plan/PlanBuildControls.tsx"),
     readDesktop("src/lib/plan-approval-preferences.ts"),
     readDesktop("src/lib/api.ts"),
     readStoreSourceSync(),
@@ -30,7 +31,7 @@ const [approvalBar, approvalPreferences, apiSource, storeSource, settingsPage, s
   ]);
 const interactionSource = readStoreModuleSync("slices/interaction-slice.ts");
 
-test("plan approval exposes only the artifact and remembers the selected mode", () => {
+test("plan approval exposes artifact and document entries and remembers the selected mode", () => {
   assert.match(approvalBar, /proposal\.title/);
   assert.match(
     approvalBar,
@@ -38,9 +39,9 @@ test("plan approval exposes only the artifact and remembers the selected mode", 
   );
   assert.match(approvalBar, /openWorkPanelTabForSession/);
   assert.match(approvalBar, /const isPending = proposal\.status === "pending"/);
-  assert.match(approvalBar, /PLAN_APPROVAL_DEFAULT_MODE/);
-  assert.match(approvalBar, /readPlanApprovalMode\(\)/);
-  assert.match(approvalBar, /rememberPlanApprovalMode\(selectedMode\)/);
+  assert.match(approvalControls, /PLAN_APPROVAL_DEFAULT_MODE/);
+  assert.match(approvalControls, /readPlanApprovalMode\(\)/);
+  assert.match(approvalControls, /rememberPlanApprovalMode\(selectedMode\)/);
   assert.match(approvalPreferences, /PLAN_APPROVAL_MODE_STORAGE_KEY/);
   assert.match(approvalPreferences, /store\.setItem\(PLAN_APPROVAL_MODE_STORAGE_KEY, mode\)/);
   assert.match(approvalPreferences, /PLAN_APPROVAL_FALLBACK_MODE/);
@@ -48,11 +49,11 @@ test("plan approval exposes only the artifact and remembers the selected mode", 
   assert.doesNotMatch(approvalBar, /planApprovalPermissionMode|feedback|changes_requested/);
   assert.doesNotMatch(apiSource, /planApprovalPermissionMode/);
   assert.doesNotMatch(storeSource, /planApprovalPermissionMode/);
-  // Every label resolves under the proposal kind's namespace, so one bar serves
-  // both `plan.*` and `goal.*` copy (D198).
+  // Approval labels resolve by kind; structured metadata summaries are Plan-only.
   assert.match(approvalBar, /return `\$\{kind\}\.\$\{name\}`/);
   assert.match(approvalBar, /const copy = \(name: string\) => t\(copyKey\(kind, name\)\)/);
-  assert.doesNotMatch(approvalBar, /t\("plan\./);
+  assert.match(approvalBar, /planWorkPanelTab\(proposal\)/);
+  assert.match(approvalBar, /data-testid="plan-view-plan"/);
   assert.match(approvalBar, /data-testid="plan-open-artifact"/);
   assert.doesNotMatch(approvalBar, /request_changes|requestChanges/);
 });
@@ -62,7 +63,7 @@ test("approval card omits validity details while the pending gate stays actionab
   assert.doesNotMatch(approvalBar, /plan-approval-question|plan-approval-expiry|plan-approval-status|plan-approval-warning/);
   assert.match(approvalBar, /className="plan-approval-title"/);
   assert.match(approvalBar, /className="plan-approval-artifact"/);
-  assert.match(approvalBar, /disabled=\{busy\}/);
+  assert.match(approvalControls, /disabled=\{busy\}/);
   assert.match(
     storeSource,
     /PendingPlanRefreshResult = "pending" \| "terminal" \| "unavailable"/,

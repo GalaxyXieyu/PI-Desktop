@@ -1,8 +1,9 @@
 /**
  * Plan UI acceptance probe (scripts/e2e-plan-ui.mjs). Installed only when
  * PI_DESKTOP_PLAN_UI_PROBE=1, it exposes a Main-only global the harness calls
- * over the inspector to seed sessions, submit plans, and settle turns through
- * the live host and sidecar instead of a fixture backend.
+ * over the inspector to seed sessions, submit structured plans, settle turns,
+ * and push checklist todos through the live host and sidecar instead of a
+ * fixture backend.
  */
 import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
@@ -20,6 +21,14 @@ type PlanUiProbeRequest = {
   title?: unknown;
   markdown?: unknown;
   question?: unknown;
+  /** Optional structured steps forwarded to plans.submit (interactive Plan tab). */
+  steps?: unknown;
+  /** Optional design spec forwarded to plans.submit (interactive Plan tab). */
+  design?: unknown;
+  /** Optional tool-call id forwarded to plans.submit; defaults per revision. */
+  toolCallId?: unknown;
+  /** TodoWrite items for the `todo` operation. */
+  todos?: unknown;
 };
 
 const PLAN_UI_PROBE_GLOBAL = "__PI_DESKTOP_PLAN_UI_PROBE";
@@ -80,6 +89,37 @@ export function createPlanUiProbe(deps: PlanUiProbeDeps) {
       throw new Error(`workspace directory not found: ${resolved}`);
     }
     return resolved;
+  }
+
+  function planUiProbeSteps(value: unknown): unknown[] {
+    if (!Array.isArray(value)) {
+      throw new Error("steps must be an array of step objects when provided");
+    }
+    for (const entry of value) {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+        throw new Error("steps entries must be objects when steps are provided");
+      }
+    }
+    return value;
+  }
+
+  function planUiProbeDesign(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error("design must be an object when provided");
+    }
+    return value as Record<string, unknown>;
+  }
+
+  function planUiProbeTodos(value: unknown): unknown[] {
+    if (!Array.isArray(value)) {
+      throw new Error("todos must be an array of todo objects when provided");
+    }
+    for (const entry of value) {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+        throw new Error("todos entries must be objects when todos are provided");
+      }
+    }
+    return value;
   }
 
   async function planUiProbeLiveSetup(
@@ -187,9 +227,10 @@ export function createPlanUiProbe(deps: PlanUiProbeDeps) {
         operation !== "seed" &&
         operation !== "submit" &&
         operation !== "settle" &&
+        operation !== "todo" &&
         operation !== "liveSetup"
       ) {
-        throw new Error("probe operation must be identity, runtimeIdentity, seed, submit, settle, or liveSetup");
+        throw new Error("probe operation must be identity, runtimeIdentity, seed, submit, settle, todo, or liveSetup");
       }
 
       const activeHost = deps.getHost();
@@ -214,6 +255,31 @@ export function createPlanUiProbe(deps: PlanUiProbeDeps) {
           sessionId,
           turnId,
           status,
+          response,
+        };
+      }
+      if (operation === "todo") {
+        const sessionId = planUiProbeString(input.sessionId, "sessionId").trim();
+        const turnId = planUiProbeString(input.turnId, "turnId").trim();
+        const todos =
+          input.todos === undefined ? [] : planUiProbeTodos(input.todos);
+        const toolCallId = "plan-ui-probe-todo";
+        const response = await activeHost.call("tools.execute", {
+          sessionId,
+          turnId,
+          toolCallId,
+          toolName: "TodoWrite",
+          mode: "agent",
+          args: { todos },
+        });
+        if (deps.getHost() !== activeHost) throw new Error("host changed during Plan UI probe");
+        return {
+          ...planUiProbeIdentity(activeHost),
+          ok: true,
+          operation,
+          sessionId,
+          turnId,
+          toolCallId,
           response,
         };
       }
@@ -277,13 +343,20 @@ export function createPlanUiProbe(deps: PlanUiProbeDeps) {
       const title = planUiProbeString(input.title, "title");
       const markdown = planUiProbeString(input.markdown, "markdown");
       const question = planUiProbeString(input.question, "question");
+      const steps =
+        input.steps === undefined ? undefined : planUiProbeSteps(input.steps);
+      const design =
+        input.design === undefined ? undefined : planUiProbeDesign(input.design);
       const turnResponse = await activeHost.call<{ turnId?: string }>(
         "session.beginTurn",
         { sessionId },
       );
       const turnId = turnResponse?.turnId;
       if (!turnId) throw new Error("session.beginTurn returned no turn");
-      const toolCallId = `plan-ui-probe-${revision}`;
+      const toolCallId =
+        input.toolCallId === undefined
+          ? `plan-ui-probe-${revision}`
+          : planUiProbeString(input.toolCallId, "toolCallId").trim();
       const response = await activeHost.call<{
         status?: string;
         proposal?: Record<string, any> | null;
@@ -294,6 +367,8 @@ export function createPlanUiProbe(deps: PlanUiProbeDeps) {
         title,
         markdown,
         question,
+        ...(steps !== undefined ? { steps } : {}),
+        ...(design !== undefined ? { design } : {}),
       });
       const proposal = response?.proposal;
       if (response?.status !== "pending") {

@@ -11,7 +11,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [apiSource, appSource, composerSource, settingsSource, commandsSource, storeSource, surfaceSource, transcriptSource, barSource, topbarSource, componentSpec, englishSource, chineseSource, planStateSource, composerCss] =
+const [apiSource, appSource, composerSource, settingsSource, commandsSource, storeSource, surfaceSource, transcriptSource, barSource, planControlsSource, planDraftModelSource, topbarSource, componentSpec, englishSource, chineseSource, planStateSource, composerCss] =
   await Promise.all([
     read("../src/lib/api.ts"),
     readAppSource(),
@@ -22,6 +22,8 @@ const [apiSource, appSource, composerSource, settingsSource, commandsSource, sto
     read("../src/components/ChatSurface.tsx"),
     readTranscriptSource(),
     read("../src/components/PlanApprovalBar.tsx"),
+    read("../src/components/plan/PlanBuildControls.tsx"),
+    read("../src/features/plan/plan-draft-model.ts"),
     read("../src/components/ConversationTopbar.tsx"),
     read("../../../docs/spec/04-ux/08-component-spec.md"),
     read("../../../packages/i18n/src/locales/en/index.ts"),
@@ -145,22 +147,27 @@ test("the component spec assigns mode ownership to Composer", () => {
 });
 
 test("plan approval sends exact identities and waits for host confirmation", () => {
-  assert.match(barSource, /proposalId: proposal\.id/);
-  assert.match(barSource, /sessionId: proposal\.sessionId/);
-  assert.match(barSource, /turnId: proposal\.turnId/);
-  assert.match(barSource, /toolCallId: proposal\.toolCallId/);
-  assert.match(barSource, /version: proposal\.version/);
+  assert.match(planControlsSource, /proposalId: proposal\.id/);
+  assert.match(planControlsSource, /sessionId: proposal\.sessionId/);
+  assert.match(planControlsSource, /turnId: proposal\.turnId/);
+  assert.match(planControlsSource, /toolCallId: proposal\.toolCallId/);
+  assert.match(planControlsSource, /version: proposal\.version/);
+  // The approve half is built by the shared draft-model helper so the bar and
+  // the tab cannot drift; reject stays an inline identity-only request.
   assert.match(
-    barSource,
-    /action === "approve"\s*\?\s*\{[\s\S]*targetPermissionMode:[\s\S]*\}\s*:\s*\{[\s\S]*\.\.\.identity,\s*action\s*\}/,
+    planControlsSource,
+    /action === "approve"\s*\?\s*buildApproveRequest\([\s\S]*?\)\s*:\s*\{[\s\S]*?\.\.\.identity,\s*action\s*\}/,
   );
-  assert.doesNotMatch(barSource, /request_changes/);
+  assert.match(planDraftModelSource, /targetPermissionMode: mode/);
+  assert.match(planDraftModelSource, /proposal\.kind === "plan" \? revision : undefined/);
+  assert.doesNotMatch(planControlsSource, /request_changes/);
   assert.match(barSource, /data-testid="plan-approval-bar"/);
-  assert.match(barSource, /role="menuitemradio"/);
-  assert.match(barSource, /aria-checked=\{approvalMode === candidate\}/);
-  assert.match(barSource, /PLAN_APPROVAL_DEFAULT_MODE/);
+  assert.match(planControlsSource, /role="menuitemradio"/);
+  assert.match(planControlsSource, /aria-checked=\{approvalMode === candidate\}/);
+  assert.match(planControlsSource, /PLAN_APPROVAL_DEFAULT_MODE/);
   assert.doesNotMatch(barSource, /planApprovalPermissionMode|feedback|changes_requested/);
-  assert.match(barSource, /ArrowDown.*ArrowUp.*Home.*End/s);
+  assert.doesNotMatch(planControlsSource, /planApprovalPermissionMode|feedback|changes_requested/);
+  assert.match(planControlsSource, /ArrowDown.*ArrowUp.*Home.*End/s);
   assert.match(transcriptSource, /const approvalPending = useAppStore/);
   assert.match(transcriptSource, /pendingPlans\[sessionId\]\?\.status === "pending"/);
   assert.doesNotMatch(transcriptSource, /PlanApprovalCard|plan-approval-card/);
@@ -170,7 +177,7 @@ test("plan approval sends exact identities and waits for host confirmation", () 
     storeSource,
     /preferredFileWorkPanelTab\(relativePath, pluginViews\)/,
   );
-  assert.match(barSource, /const isPending = proposal\.status === "pending"/);
+  assert.match(planControlsSource, /const isPending = proposal\.status === "pending"/);
   const resolveBlock = interactionSource.slice(interactionSource.indexOf("resolvePlan: async"));
   assert.match(resolveBlock, /await api\.resolvePlan\(resolution\)/);
   assert.match(resolveBlock, /get\(\)\.handlePlansChanged/);

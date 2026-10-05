@@ -11,11 +11,12 @@ import test from "node:test";
 const readDesktop = (relativePath) =>
   readFile(new URL(`../${relativePath}`, import.meta.url), "utf8");
 
-const [store, planState, approvalBar, composer, packageJson] =
+const [store, planState, approvalBar, approvalControls, composer, packageJson] =
   await Promise.all([
     readStoreSourceSync(),
     readDesktop("src/lib/plan-mode-state.ts"),
     readDesktop("src/components/PlanApprovalBar.tsx"),
+    readDesktop("src/components/plan/PlanBuildControls.tsx"),
     readComposerSourceSync(),
     readDesktop("package.json"),
   ]);
@@ -44,11 +45,11 @@ test("terminal proposals and execution states stay session-scoped and readable",
 });
 
 test("each pending proposal restores the remembered approval choice", () => {
-  assert.match(approvalBar, /useState<GlobalPermissionMode>\(\s*readPlanApprovalMode\(\)/);
-  assert.match(approvalBar, /setApprovalMode\(readPlanApprovalMode\(\)\)/);
-  assert.match(approvalBar, /rememberPlanApprovalMode\(selectedMode\)/);
-  assert.match(approvalBar, /\}, \[proposal\.id\]\);/);
-  assert.doesNotMatch(approvalBar, /state\.settings|planApprovalPermissionMode/);
+  assert.match(approvalControls, /useState<GlobalPermissionMode>\(\s*readPlanApprovalMode\(\)/);
+  assert.match(approvalControls, /setApprovalMode\(readPlanApprovalMode\(\)\)/);
+  assert.match(approvalControls, /rememberPlanApprovalMode\(selectedMode\)/);
+  assert.match(approvalControls, /\}, \[proposal\.id\]\);/);
+  assert.doesNotMatch(approvalControls, /state\.settings|planApprovalPermissionMode/);
 });
 
 test("pending input is retained but every composer/model mutation control is gated", () => {
