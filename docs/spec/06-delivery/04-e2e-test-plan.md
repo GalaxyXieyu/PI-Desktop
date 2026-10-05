@@ -11325,6 +11325,36 @@ This test plan spec is accepted when:
 - **Milestone**: M5
 - **Status**: Documented
 
+#### E2E-EDIT-legacy-replacement-preserves-unmatched-text: A legacy Edit replaces only the matched text
+
+- **Preconditions**: A workspace with an LF file containing `let x = foo;`,
+  `value = 1; // keep me`, and a two-line statement, plus a CRLF copy of the
+  first line.
+- **Steps**:
+  1. Issue an `Edit` with only `path`, `old_string` `= foo;`, and `new_string`
+     `= bar;` (no `tag`, no `ops`).
+  2. Issue a legacy `Edit` whose `old_string` is `value = 1;`, then one whose
+     `old_string` starts mid-line and ends mid-line on the following line.
+  3. Issue a legacy `Edit` whose `old_string` is a whole line including its
+     newline and whose `new_string` is empty.
+  4. Repeat step 1 on the CRLF file, then issue one legacy `Edit` whose
+     `old_string` is not in the file.
+  5. Compare every file on disk to the intended content byte for byte.
+- **Expected**: Each replacement succeeds and returns a new `tag`, and only the
+  matched text changes: the line reads `let x = bar;`, the trailing comment
+  survives, the multi-line match keeps the text before its start and after its
+  end, the whole-line deletion removes that line without leaving a blank line or
+  touching its neighbours, and the CRLF file keeps CRLF endings. The missing
+  `old_string` fails with `EDIT_LEGACY_MATCH_FAILED` and leaves the file
+  unchanged.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §11
+- **Acceptance**: E (tools & permissions)
+- **Milestone**: M5+
+- **Status**: Automated (host-core unit tests:
+  `edit_legacy_replacement_preserves_unmatched_bytes`,
+  `edit_legacy_identical_replacement_leaves_file_unchanged`,
+  `edit_accepts_legacy_old_string_new_string_shape`)
+
 #### E2E-142: Background delegation converges through TaskWait and honors permission scopes
 
 - **Preconditions**: A project-bound Agent session whose permission mode can be
