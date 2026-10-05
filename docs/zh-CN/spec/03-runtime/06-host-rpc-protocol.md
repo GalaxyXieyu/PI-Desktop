@@ -115,7 +115,7 @@ Electron 和 sidecar 不能独立过度接纳相同的资源。
 
 ```ts
 type HandshakeParams = {
-  protocolVersion: 11
+  protocolVersion: 12
   client: "electron-main"
   clientVersion: string
   locale: string // default "en"
@@ -126,7 +126,7 @@ type HandshakeParams = {
 
 ```ts
 type HandshakeResult = {
-  protocolVersion: 11
+  protocolVersion: 12
   host: "rust-host-core"
   hostVersion: string
   features: string[]
@@ -154,9 +154,14 @@ type HandshakeResult = {
 9. 版本 11 撤回 A2A 协议栈（ADR 0165 / D326）。`a2a.*` 方法和通知
    已移除，握手不再声明 `a2a`；v10 主机或客户端必须在 UI 交互前拒绝。
 
-协议 v11 与 host-core 存储架构 v14 配对。v14 增加插件会话来源 sidecar
-和软删除字段；架构版本是内部持久性不变量，而不是额外的 JSON-RPC 字段，
-检查点架构仍然由主机拥有。
+10. 版本 12 增加交互式 Plan 元数据和审批修订。v11 对端会被拒绝，而不是
+    静默丢弃已批准的结构。
+
+协议 v12 增加交互式 Plan 存储架构 v22（继 v21 之后）。更早的架构历史：
+架构 v12 曾通过 `migrate_v11_to_v12` 增加 A2A 表（`a2a_tasks`、`a2a_messages`、
+`a2a_artifacts`、`a2a_push_configs`）；`migrate_v12_to_v13` 删除这些表，
+v14 增加插件会话来源 sidecar 和软删除字段；架构版本是内部持久性不变量，
+而不是额外的 JSON-RPC 字段，检查点架构仍然由主机拥有。
 
 ## 4. 方法目录(MVP)
 
@@ -347,10 +352,19 @@ ids 和非负 `tokensBefore`；它不会插入 message/search 行
 - TodoWrite 只允许 Agent 会话自己的运行 turn。Plan/Goal、委托、插件和 MCP 调用会返回工具错误，
   不会修改存储。成功替换即使 `todos` 为空也会推进 revision，并且只在事务提交后发出
   `todos.changed`；事件负载与 `todos.get` 返回的完整快照一致。
+- TodoWrite 项接受可选的 `stepId`（Plan 步骤 id 语法，1–64 个字符，
+  在一次写入内唯一）。省略它的项只有在恰好一个先前项拥有相同的规范化
+  内容且没有其他新项认领该 id 时才继承先前的步骤 id；Plan 审批事务
+  在同一提交中播种带步骤 id 的行。参见
+  [交互式 Plan 元数据](interactive-plan-metadata.md)。
 - SQLite 只由 host-core 拥有。渲染器通过 Electron Main IPC 接收快照，按 session id 保存并忽略
   更旧或相同 revision。远程 RACP 会话在这条垂直切片中保持 local-only，因为 RACP v1 尚无 Todo 快照操作。
 
 ### Plan 和 Goal 状态和批准
+
+协议 12 为 Plan 增加可选的结构化元数据和会话作用域的 `plans.get`；
+规范化、错误、持久化和执行投影合约参见
+[交互式 Plan 元数据](interactive-plan-metadata.md)。
 
 两种合约类型共享这些方法；可选的 `kind`
 （`plan | goal`，默认 `plan`，因此 D198 之前的 sidecar 仍然有效）选择哪个
@@ -375,6 +389,46 @@ ids 和非负 `tokensBefore`；它不会插入 message/search 行
   选择匹配的执行指令
 - `plans.abort` — 标记待审批工作已中断；它永远不会重播或
   将已批准的会话更改回其合同模式
+
+### 交互式 Plan 元数据（协议 12）
+
+`plans.submit` 可只为 Plan 携带 `steps?: PlanStep[]` 和
+`design?: PlanDesignSpec`。Goal 元数据为 `PLAN_METADATA_UNSUPPORTED`。
+在写入不可变 Markdown 工件之前校验；元数据永远不会重写其字节。
+`plans.get({ sessionId, proposalId })` 以任意状态返回 `{ proposal }`；
+未知 proposal 或会话不匹配为 `PLAN_NOT_FOUND`。
+
+Proposal 记录增加可选的提交 `steps`/`design` 和可选的
+`resolvedSteps`/`resolvedDesign`。批准接受 `revisedSteps` 和
+`revisedDesign`；拒绝禁止两者（`PLAN_INVALID_ARGUMENT`）。省略的
+修订保留提交的元数据；`[]` 和 `{}` 显式清空。已批准 proposal 的重放
+只有在动作、权限模式和两个规范化修订都与已存储的决议一致时才会
+无写入地成功（省略等同于 NULL，而不是显式清空）；任何不匹配都
+以 `PLAN_APPROVAL_CONFLICT` 失败。执行描述符只公开有效的非空
+元数据。旧有 proposal 省略全部四个字段。
+
+共享校验器返回 `{ ok: true, value }` 或
+`{ ok: false, code, path, message }`，其中 message 为
+`<CODE> <path>: <reason>`。规范化/限制：
+
+- Steps 是最多 24 个的数组；`[]` 表示没有。原始和规范化序列化
+  JSON 限制为 64 KiB UTF-8。ID 修剪为 1–64 个 ASCII 字符，匹配
+  `^[A-Za-z0-9][A-Za-z0-9._-]*$`，且区分大小写地唯一。
+- Title 修剪为 1–200 个 Unicode 字符，不含 U+0000–001F 或 U+007F。
+  可选的 detail 修剪至最多 2000 个字符，禁止 NUL，允许换行，
+  为空时消失。缺失的依赖变为 `[]`；至多 24 个 ID 被修剪并必须指向
+  既有的其他步骤且不重复。环会连同环路径一起被拒绝。未知键被拒绝。
+- Design 的 framework/component-library slug 修剪、小写，为空时
+  消失；否则匹配 `^[a-z0-9][a-z0-9.+/_-]*$`，至多 40 个字符。
+  至多 12 个修剪后的非空样式关键词各允许 40 个 Unicode 字符，
+  无控制字符且不区分大小写地不重复。
+- 字体家族修剪为 1–120 个 Unicode 字符，无控制字符。
+  heading/subheading/body 尺寸匹配 `^\d{1,2}px$` 且处于 10–72px；
+  weight 是 100–900 之间、为 100 的整数倍的整数。
+- primary/background/text/functional 颜色分组各允许至多八个
+  `#RRGGBB` 颜色，规范化为大写。无效颜色提示 `use #RRGGBB`。
+  所有 design 对象拒绝未知键。原始和规范化 design JSON 限制为
+  16 KiB UTF-8；全部字段缺省时产生 `{}`。
 
 ### 计划任务
 

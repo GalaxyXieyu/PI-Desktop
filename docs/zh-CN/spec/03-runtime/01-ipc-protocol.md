@@ -307,11 +307,13 @@ type PlanProposalStatus =
 type PlanExecutionState =
   | "queued" | "running" | "completed" | "interrupted";
 
-// Same shape for SubmitPlan and SubmitGoal; the tool name selects the kind.
+// SubmitGoal keeps the base fields only; structured metadata is Plan-only.
 type SubmitPlanInput = {
   title: string;
   markdown: string;
   question: string;
+  steps?: PlanStep[];
+  design?: PlanDesignSpec;
 };
 
 type PlanArtifact = {
@@ -343,6 +345,10 @@ type PlanProposal = {
   version: number;
   executionId?: string;
   executionState?: PlanExecutionState;
+  steps?: PlanStep[];
+  design?: PlanDesignSpec;
+  resolvedSteps?: PlanStep[];
+  resolvedDesign?: PlanDesignSpec;
 };
 
 type PlanExecution = {
@@ -356,6 +362,8 @@ type PlanExecution = {
   artifact: PlanArtifact;
   targetPermissionMode: GlobalPermissionMode;
   state: PlanExecutionState;
+  steps?: PlanStep[];
+  design?: PlanDesignSpec;
 };
 
 type PlanningStateEvent = {
@@ -396,6 +404,8 @@ type PlanResolveRequest =
   | (PlanResolveIdentity & {
       action: "approve";
       targetPermissionMode: GlobalPermissionMode;
+      revisedSteps?: PlanStep[];
+      revisedDesign?: PlanDesignSpec;
     })
   | (PlanResolveIdentity & { action: "reject" });
 
@@ -412,17 +422,33 @@ type PlanResolutionResult = {
 预加载方法：
 
 - `pi-desktop/plans/pending({ sessionId? }) -> PlansPendingResult`
+- `pi-desktop/plans/get({ sessionId, proposalId }) -> { proposal: PlanProposal }`
 - `pi-desktop/plans/resolve(PlanResolveRequest) -> PlanResolutionResult`
+
+渲染器通过预加载共享的允许列表 `invoke` 暴露
+`getPlan(PlansGetRequest): Promise<PlansGetResult>`。Main 要求非空字符串身份，
+修剪它们，并向 `plans.get` 精确转发 `sessionId` 和 `proposalId`。
+对于批准，Main 使用共享校验器验证提供的修订并转发规范化值，
+包括显式的 `[]`/`{}` 清空。无效元数据在 host I/O 之前抛出其校验器
+`errorCode`；带任一修订的 reject 为 `PLAN_INVALID_ARGUMENT`。省略的修订保持旧有
+线材参数不变。参见
+[元数据语义](06-host-rpc-protocol.md#交互式-plan-元数据协议-12)。
+
+已注册的远程会话将这两个操作都路由到远程后端：修订失败于
+`PLAN_REVISION_UNSUPPORTED`，get 失败于 `UNSUPPORTED`，不会发送远程请求
+也不会回落到本地主机。Proposal/事件规范化保留提交、resolved 和有效
+元数据。host-runtime 执行解码拒绝格式错误的存在元数据而不是丢弃它；
+null/undefined 和规范化的空元数据会省略该执行字段。
 
 Electron 将每个主机 `plans.changed` 通知原封不动地转发到
 通过稳定的共享 `IPC.event.plansChanged` 通道渲染器
 （`pi-desktop/plans/event/changed`）。这是 Plan/Goal 更改事件表面；
 的
 渲染器不会接收作为 AgentEvent 变体的合同批准转换。
-`plans.pending` 仅返回当前待批准的行。终端
-`plan_approvals` 行保留持久主机记录，但不是渲染器
-水合数据；渲染器仅保留其最新的合同快照
-当实时 `plans.changed` 事件到达时当前渲染器的生命周期。
+`plans.pending` 仅返回当前待批准的行。终止态
+`plan_approvals` 行仍是持久的 Host 记录，并且可以通过确切的
+session/proposal 身份经 `plans.get` 读取；实时 `plans.changed` 事件保持
+渲染器的当前合约快照。
 
 对于 `approve`、host-core 和 Electron 需要显式
 `targetPermissionMode`； Electron 永远不会从存储的设置中填充它。的
@@ -1138,7 +1164,7 @@ Plan 不会取代此通用许可合同。 Plan `Bash` 调用
 
 ## 11. 版本兼容性
 
-- IPC/host 合约版本字段：`protocolVersion: 10`
+- IPC/host 合约版本字段：`protocolVersion: 12`
 - 重大更改必须提升版本并记录 ADR
 - 渲染器和主程序在启动时验证版本；不匹配时，提示 upgrade/reinstall
 - 协议 v4 增加了通知记录、通道和

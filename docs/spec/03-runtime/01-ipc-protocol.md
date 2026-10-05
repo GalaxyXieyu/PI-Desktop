@@ -370,11 +370,13 @@ type PlanProposalStatus =
 type PlanExecutionState =
   | "queued" | "running" | "completed" | "interrupted";
 
-// Same shape for SubmitPlan and SubmitGoal; the tool name selects the kind.
+// SubmitGoal keeps the base fields only; structured metadata is Plan-only.
 type SubmitPlanInput = {
   title: string;
   markdown: string;
   question: string;
+  steps?: PlanStep[];
+  design?: PlanDesignSpec;
 };
 
 type PlanArtifact = {
@@ -406,6 +408,10 @@ type PlanProposal = {
   version: number;
   executionId?: string;
   executionState?: PlanExecutionState;
+  steps?: PlanStep[];
+  design?: PlanDesignSpec;
+  resolvedSteps?: PlanStep[];
+  resolvedDesign?: PlanDesignSpec;
 };
 
 type PlanExecution = {
@@ -419,6 +425,8 @@ type PlanExecution = {
   artifact: PlanArtifact;
   targetPermissionMode: GlobalPermissionMode;
   state: PlanExecutionState;
+  steps?: PlanStep[];
+  design?: PlanDesignSpec;
 };
 
 type PlanningStateEvent = {
@@ -459,6 +467,8 @@ type PlanResolveRequest =
   | (PlanResolveIdentity & {
       action: "approve";
       targetPermissionMode: GlobalPermissionMode;
+      revisedSteps?: PlanStep[];
+      revisedDesign?: PlanDesignSpec;
     })
   | (PlanResolveIdentity & { action: "reject" });
 
@@ -475,7 +485,24 @@ type PlanResolutionResult = {
 Preload methods:
 
 - `pi-desktop/plans/pending({ sessionId? }) -> PlansPendingResult`
+- `pi-desktop/plans/get({ sessionId, proposalId }) -> { proposal: PlanProposal }`
 - `pi-desktop/plans/resolve(PlanResolveRequest) -> PlanResolutionResult`
+
+The renderer exposes `getPlan(PlansGetRequest): Promise<PlansGetResult>` through
+preload's shared allowlisted `invoke`. Main requires non-empty string identities,
+trims them, and forwards exactly `sessionId` and `proposalId` to `plans.get`.
+For approvals, Main validates present revisions with the shared validators and
+forwards normalized values, including explicit `[]`/`{}` clears. Invalid metadata
+throws its validator `errorCode` before host I/O; reject with either revision is
+`PLAN_INVALID_ARGUMENT`. Omitted revisions leave legacy wire parameters unchanged.
+See [metadata semantics](06-host-rpc-protocol.md#interactive-plan-metadata-protocol-v12).
+
+Registered remote sessions route both operations to the remote backend: revisions
+fail with `PLAN_REVISION_UNSUPPORTED`, and get fails with `UNSUPPORTED`, without
+sending a remote request or falling through to the local host. Proposal/event
+normalization preserves submitted, resolved, and effective metadata. Host-runtime
+execution decoding rejects malformed present metadata instead of dropping it;
+null/undefined and normalized empty metadata omit the execution field.
 
 Electron forwards each host `plans.changed` notification unchanged to the
 renderer through the stable shared `IPC.event.plansChanged` channel
@@ -483,9 +510,9 @@ renderer through the stable shared `IPC.event.plansChanged` channel
 the
 renderer does not receive contract approval transitions as AgentEvent variants.
 `plans.pending` returns only currently pending approval rows. Terminal
-`plan_approvals` rows remain durable Host records, but are not renderer
-hydration data; the renderer retains its latest contract snapshot only for the
-current renderer lifetime while live `plans.changed` events arrive.
+`plan_approvals` rows remain durable Host records and can be read by exact
+session/proposal identity through `plans.get`; live `plans.changed` events retain
+the renderer's current contract snapshot.
 
 For `approve`, host-core and Electron require an explicit
 `targetPermissionMode`; Electron never fills it from stored settings. The
@@ -1417,7 +1444,7 @@ above.
 
 ## 11. Version Compatibility
 
-- IPC/host contract version field: `protocolVersion: 11`
+- IPC/host contract version field: `protocolVersion: 12`
 - Breaking changes must bump the version and record an ADR
 - renderer and main validate the version at startup; on mismatch, prompt to upgrade/reinstall
 - Protocol v4 adds notification records, channels, and the

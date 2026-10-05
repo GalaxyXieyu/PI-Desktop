@@ -12,7 +12,7 @@
 当前应用程序中的功能。当前的实现添加了 Goal 合约，
 独立 MCP/Skills/Subagents、插件市场和启动器流程、会话
 导入、计划任务和下一轮输入框配置。主机线材
-协议为 v11；存储架构为 v15（见 `00-baseline.md`）。
+协议为 v12；存储架构为 v22（见 `00-baseline.md`）。
 
 ## 快速进入
 
@@ -92,9 +92,10 @@ docs/spec/
    `.pi/plan/*.md`神器； title/question 保持结构化
    `plan_approvals`，批准打开工件，仅限 approve/reject，并且
    `PLAN_APPROVAL_TIMEOUT` 在 30 绝对分钟后过期
-9. 协议 v11 和存储架构 v15 对 Plan/Goal 检查点、
-   `plan_approvals` 执行字段、启动中断和外壳身份具有权威性。
-   v11 撤回 v10 添加的 A2A 方法域。
+9. 协议 v12 和存储架构 v22 对 Plan/Goal 检查点、
+   `plan_approvals` 执行字段、启动中断、外壳身份和主机拥有的会话协作具有
+   权威性。v11 撤回了 v10 添加的 A2A 方法域；v12 增加了交互式 Plan 结构化
+   元数据与审批修订（ADR interactive-plan-structured-revision）。
 10、本地权限确认无自动截止时间；Bash 超时默认 60 秒
 11.本地用户可安装的插件（稍后上市）
 12. 标签版本 = macOS arm64、Intel x64、Windows x64 和 Linux x64 及 arm64 (D126/D285、D638/ADR 0318)

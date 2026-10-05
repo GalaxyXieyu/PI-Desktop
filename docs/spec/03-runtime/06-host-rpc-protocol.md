@@ -126,7 +126,7 @@ Params:
 
 ```ts
 type HandshakeParams = {
-  protocolVersion: 11
+  protocolVersion: 12
   client: "electron-main"
   clientVersion: string
   locale: string // default "en"
@@ -137,7 +137,7 @@ Result:
 
 ```ts
 type HandshakeResult = {
-  protocolVersion: 11
+  protocolVersion: 12
   host: "rust-host-core"
   hostVersion: string
   features: string[]
@@ -171,7 +171,11 @@ Rules:
    advertises `"a2a"`. A v10 host or client is rejected before the UI becomes
    interactive, so a mixed pair cannot call a missing domain.
 
-Protocol v11 is paired with host-core storage schema v16. Schema v12 had added
+10. Version 12 adds Interactive Plan metadata and approval revisions. A v11
+    peer is rejected rather than silently dropping the approved structure.
+
+Protocol v12 adds Interactive Plan storage schema v22 (following v21).
+Earlier schema history: schema v12 had added
 the A2A tables (`a2a_tasks`, `a2a_messages`, `a2a_artifacts`,
 `a2a_push_configs`) via `migrate_v11_to_v12`; `migrate_v12_to_v13` drops those
 tables, and v14 adds the plugin-session ownership sidecar and soft-delete
@@ -514,6 +518,12 @@ deletes per 60 seconds. P2/P3 methods are not present in protocol v11.
   storage. A successful replacement advances the session revision even when
   `todos` is empty and emits `todos.changed` after the transaction commits.
   The event payload is the same complete snapshot returned by `todos.get`.
+- TodoWrite items accept an optional `stepId` (the Plan step id grammar,
+  1–64 characters, unique within the write). An item that omits it inherits a
+  previous step id only when exactly one prior item had identical normalized
+  content and no other new item claims that id; the Plan approval transaction
+  seeds rows with their step ids in the same commit. See
+  [Interactive Plan metadata](interactive-plan-metadata.md).
 - SQLite ownership is host-core only. The renderer receives snapshots through
   Electron Main IPC, keeps them by session id, and ignores revisions older than
   or equal to the cached revision. Remote RACP sessions are local-only for this
@@ -532,6 +542,10 @@ deletes per 60 seconds. P2/P3 methods are not present in protocol v11.
   (D335 / ADR 0173), not a Settings destination.
 
 ### Plan and Goal state and approvals
+
+Protocol 12 adds optional structured Plan metadata and session-scoped
+`plans.get`; see [Interactive Plan metadata](interactive-plan-metadata.md) for
+normalization, error, persistence, and execution projection contracts.
 
 Both contract kinds share these methods; the optional `kind`
 (`plan | goal`, default `plan` so a pre-D198 sidecar still works) selects which
@@ -556,6 +570,48 @@ contract is being negotiated.
   select the matching execution instruction
 - `plans.abort` — marks pending approval work interrupted; it never replays or
   changes an already-approved session back to its contract mode
+
+### Interactive Plan metadata (protocol v12)
+
+`plans.submit` may carry `steps?: PlanStep[]` and `design?: PlanDesignSpec`
+for Plan only. Goal metadata is `PLAN_METADATA_UNSUPPORTED`. Validate before
+writing the immutable Markdown artifact; metadata never rewrites its bytes.
+`plans.get({ sessionId, proposalId })` returns `{ proposal }` in any status;
+an unknown proposal or session mismatch is `PLAN_NOT_FOUND`.
+
+Proposal records add optional submitted `steps`/`design` and optional
+`resolvedSteps`/`resolvedDesign`. Approval accepts `revisedSteps` and
+`revisedDesign`; rejection forbids both (`PLAN_INVALID_ARGUMENT`). Omitted
+revisions preserve submitted metadata; `[]` and `{}` explicitly clear it.
+A replay of an already-approved proposal succeeds without writes only when
+the action, permission mode, and both normalized revisions equal the stored
+resolution (omitted equals NULL, not an explicit clear); any mismatch fails
+with `PLAN_APPROVAL_CONFLICT`. Execution descriptors expose only
+effective nonempty metadata. Legacy proposals omit all four fields.
+
+Shared validators return `{ ok: true, value }` or
+`{ ok: false, code, path, message }`, where message is
+`<CODE> <path>: <reason>`. Normalization/limits:
+
+- Steps are an array of up to 24; `[]` means none. Raw and normalized serialized
+  JSON are capped at 64 KiB of UTF-8. IDs trim to 1–64 ASCII characters matching
+  `^[A-Za-z0-9][A-Za-z0-9._-]*$` and are unique case-sensitively.
+- Titles trim to 1–200 Unicode characters without U+0000–001F or U+007F.
+  Optional details trim to at most 2000 characters, forbid NUL, allow newlines,
+  and disappear when empty. Missing dependencies become `[]`; at most 24 IDs
+  are trimmed and must name existing other steps without duplicates. Cycles
+  are rejected with the cycle path. Unknown keys are rejected.
+- Design framework/component-library slugs trim, lowercase, and disappear when
+  empty; otherwise they match `^[a-z0-9][a-z0-9.+/_-]*$` within 40 characters.
+  Up to 12 trimmed nonempty style keywords each allow 40 Unicode characters,
+  no control characters, and no case-insensitive duplicates.
+- Font family trims to 1–120 Unicode characters without control characters.
+  Heading/subheading/body sizes match `^\d{1,2}px$` within 10–72px; weights are
+  integers 100–900 in multiples of 100.
+- Primary/background/text/functional color groups each allow at most eight
+  `#RRGGBB` colors, normalized uppercase. Invalid colors say `use #RRGGBB`.
+  All design objects reject unknown keys. Raw and normalized design JSON are
+  capped at 16 KiB UTF-8; all-absent fields produce `{}`.
 
 ### Scheduled tasks
 

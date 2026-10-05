@@ -6,6 +6,7 @@
 - Baseline: `0.4.14`
 - Protocol: v9
 - Storage schema: v10
+- Amended by: ADR interactive-plan-structured-revision (structured Plan metadata and approval revisions)
 
 ## Context
 
@@ -28,7 +29,7 @@ tool, which ADR 0064 restores as `new_context`); Write, Edit, plugin tools, and
 unknown tools remain host-denied. `SubmitPlan` is the only assistant tool call in its batch
 and is valid only for the active Plan turn.
 
-The input is exactly:
+The original checkpoint input was:
 
 ```ts
 type SubmitPlanInput = {
@@ -38,9 +39,12 @@ type SubmitPlanInput = {
 };
 ```
 
-There is no `ExitPlanMode`, structured step schema, `proposedCommands` field,
-or `request_changes` action. A revision is a new `SubmitPlan` after the
-current proposal is rejected or expires.
+There is no `ExitPlanMode`, `proposedCommands` field, or `request_changes`
+action. Protocol v12's Interactive Plan amendment adds optional structured
+steps/design and inline approval revisions; see the current
+[host RPC contract](../spec/03-runtime/06-host-rpc-protocol.md#interactive-plan-metadata-protocol-v12).
+These fields remain separate from the immutable Markdown artifact. Omitted
+metadata and revisions retain the original checkpoint behavior.
 
 ### 2. Immutable host-written plan artifacts
 
@@ -152,8 +156,8 @@ transactional; `PRAGMA user_version = 10` is written last.
 
 ### Tradeoffs
 
-- Rejecting a plan is terminal; revisions require another model turn and a new
-  artifact.
+- Replacing Markdown requires a new submission and artifact. Protocol v12
+  permits structured metadata revisions inline at approval without rewriting it.
 - A host restart interrupts even an approved queued or running execution.
 - Plan artifacts accumulate under `.pi/plan/`; they are immutable and are not a
   renderer-owned draft store.

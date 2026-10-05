@@ -9,8 +9,8 @@ The baseline is a frozen decision artifact, not a complete list of every
 feature in the current app. The current implementation adds Goal contracts,
 standalone MCP/Skills/Subagents, plugin marketplace and launcher flows, session
 import, scheduled tasks, next-turn composer configuration, and host-owned
-session collaboration messages. The host wire protocol is v11; storage schema
-is v16 (see `00-baseline.md`).
+session collaboration messages. The host wire protocol is v12; storage schema
+is v22 (see `00-baseline.md`).
 
 ## Quick entry
 
@@ -92,10 +92,11 @@ docs/spec/
    `.pi/plan/*.md` artifact; title/question stay structured in
    `plan_approvals`, approval opens the artifact, is approve/reject only, and
    expires after 30 absolute minutes with `PLAN_APPROVAL_TIMEOUT`
-9. Protocol v11 and storage schema v16 are authoritative for Plan/Goal
+9. Protocol v12 and storage schema v22 are authoritative for Plan/Goal
    checkpoints, `plan_approvals` execution fields, startup interruption, shell
-   identity, and host-owned session collaboration. v11 withdraws the A2A method
-   domain added in v10.
+   identity, and host-owned session collaboration. v11 withdrew the A2A method
+   domain added in v10; v12 adds Interactive Plan structured metadata and
+   approval revisions (ADR interactive-plan-structured-revision).
 10. Local permission approvals have no automatic deadline; Bash timeout 60s by
     default
 11. Local user-installable plugins (market later)

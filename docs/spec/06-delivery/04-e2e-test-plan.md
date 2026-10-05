@@ -562,6 +562,75 @@ levels does not waive the relevant E2E gate.
 
 ---
 
+### E2E-PLAN-METADATA: Interactive Plan host metadata acceptance
+
+- **Preconditions**: Protocol 12 host, isolated workspace and schema 22 database;
+  an existing schema 21 fixture with approval and checklist rows for upgrade.
+- **Steps**: Submit a Plan with steps and design; reload pending; approve or
+  reject and fetch it through `plans.get`. Fetch using another session. Submit
+  cyclic steps, invalid colors, Goal metadata, and omitted/empty metadata.
+  Reopen the upgraded database and inspect the original rows and artifacts.
+- **Expected**: Normalized metadata persists and reads back; session mismatch is
+  `PLAN_NOT_FOUND`; invalid metadata creates neither file nor row; omitted/empty
+  metadata leaves legacy wire shape and exact artifact bytes unchanged. Upgrade
+  preserves rows with NULL metadata and is idempotent.
+- **Specs linked**: `03-runtime/interactive-plan-metadata.md`
+- **Acceptance criterion**: Host-owned persistence and protocol correctness.
+- **Milestone**: Interactive Plan.
+- **Status**: Automated Rust RPC/filesystem and migration tests; live Electron
+  coverage is `E2E-PLAN-interactive-tab-edit-build-progress` and host coverage
+  is the `E2E-PLAN-METADATA-*` cases.
+
+### E2E-PLAN-plan-tab-document-review: Read-only plan document review
+
+- **Preconditions**: A local pending Plan, a legacy proposal without metadata,
+  an approved proposal with revisions, and a remote session checkpoint.
+- **Steps**: Open the document from the approval bar. Read Markdown, design,
+  tasks and dependency chips. Reopen the entry, reorder tabs, switch sessions
+  and return. Open the artifact. Resolve the proposal and inspect its effective
+  revision. Open a historical local proposal; switch identity before its read
+  completes. Open a remote proposal with and without stored data. After Build,
+  close the Plan tab and reopen it from View plan in the SubmitPlan history
+  card; repeat after restarting and reloading the transcript.
+- **Expected**: One session-scoped tab per proposal; existing artifact and
+  approval behavior preserved. Legacy proposals have no empty metadata sections.
+  Effective revisions replace submitted metadata, including explicit clears.
+  Stale reads do not replace current data; remote tabs never fetch. Loading,
+  failures, and remote read-only state are visible. Closing a tab retains its
+  draft; resolving the proposal discards it. View plan is absent for SubmitGoal
+  cards, Read rows, topology rows, and SubmitPlan results without a valid
+  proposal.
+- **Specs linked**: `03-runtime/interactive-plan-metadata.md`
+- **Acceptance criterion**: Read-only contract review and session isolation.
+- **Milestone**: Interactive Plan.
+- **Status**: Automated reducer, store/tab flow, SSR and controlled hook-scheduler
+  tests (`plan-draft-model`, `plan-tab-render`, `plan-tab-loading`, and
+  `work-panel-tabs`). `tool-row-plan-open` covers the history card's View plan
+  visibility through ToolRow SSR. Live Electron editor and Build/Reject
+  journeys are covered by `E2E-PLAN-interactive-tab-edit-build-progress`.
+
+### E2E-PLAN-step-progress-and-graph: Plan progress and dependency graph
+
+- **Preconditions**: A pending local Plan with a diamond-shaped step dependency
+  graph, an approved revised Plan, and a legacy Plan without steps/design.
+- **Steps**: Open the pending tab, inspect dependency chips, edit a title, and
+  switch List → Graph → List. Approve a revised plan and update its session
+  checklist through completed, in-progress and cancelled states. Switch views
+  again, then inspect a plan before checklist data arrives and the legacy plan.
+- **Expected**: Graph uses the live draft before approval and effective steps
+  afterwards, with one node per task and one directed edge per dependency.
+  Chips show dependency indices/titles. Checklist IDs take precedence over
+  title fallback; unmatched steps show pending. Both views retain the completed
+  count and execution badge. Status indicators are read-only. The graph exposes
+  an accessible summary and list fallback; legacy plans gain no empty section.
+- **Specs linked**: `03-runtime/interactive-plan-metadata.md`
+- **Acceptance criterion**: C — Conversation; read-only execution contract review.
+- **Milestone**: Interactive Plan.
+- **Status**: Automated layout/progress units, SSR contract rendering and
+  controlled List/Graph interaction tests (`plan-flowchart-layout`,
+  `plan-step-progress`, `plan-contract-view`, `plan-view-toggle`). Live Electron
+  validation is covered by `E2E-PLAN-interactive-tab-edit-build-progress`.
+
 ## 4. Tooling Intent
 
 | Tool | Purpose | Status |
@@ -6860,6 +6929,35 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   exact readable backups, fail-closed rollback, restart, transcript, settings,
   scheduled-mode, approval-field, and index tests
 
+#### E2E-PLAN-METADATA: Approved structure preserves explicit user revisions
+
+- **Preconditions**: Protocol v12 task candidate with isolated host/workspace;
+  deterministic provider fixture, no paid endpoint or user desktop.
+- **Steps**: Submit a legacy Plan, then one with a dependency diamond and a
+  design. Edit metadata and approve, query via `plans.get`, and inspect the
+  execution descriptor. Repeat with omitted revisions and explicit `[]`/`{}`
+  clears. Submit malformed metadata, duplicate dependencies, cycles, and
+  oversized UTF-8 JSON; attempt metadata on Goal and revisions on rejection.
+- **Expected**: Legacy shape/behavior and artifact bytes stay unchanged.
+  Revisions win only when present; explicit clears disable effective metadata.
+  Validation errors identify their paths (and cycle paths) before any write.
+  Goal metadata and reject revisions fail without changing approval state.
+  Through renderer/preload/Main, normalized approval revisions reach host RPC,
+  while invalid revisions cause no host call. `plans.get` forwards only validated
+  session/proposal IDs; proposal and event metadata survive normalization.
+  Registered remote sessions reject revisions with `PLAN_REVISION_UNSUPPORTED`
+  and lookup with `UNSUPPORTED` without remote I/O or local fallback. Malformed
+  present execution metadata fails closed in the host-runtime decoder.
+- **Specs linked**: `03-runtime/06-host-rpc-protocol.md`,
+  `03-runtime/08-error-codes.md`.
+- **Acceptance**: F (contract preservation), H (diagnostics).
+- **Milestone**: Interactive Plan.
+- **Status**: Shared validators and effective-contract flow are unit-covered by
+  `plan-steps.test.ts` and `plan-design.test.ts`. Transport/decoder coverage is in
+  `interactive-plan-ipc.test.mjs`, `remote-backend.test.mjs`, and host-runtime
+  `plan-execution.test.ts`; full cross-process acceptance awaits the integrated
+  host/runtime/UI candidate.
+
 #### E2E-105: Plan policy remains host-authoritative
 
 - **Preconditions**: A project-bound session is idle in Plan with BrowserPreview,
@@ -6933,6 +7031,20 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `04-ux/08-component-spec.md`, `05-security/01-security.md`, ADR 0053
 - **Acceptance**: C (conversation/stream), E (permissions), F (persistence)
 - **Milestone**: M6
+- **Interactive Plan runtime extension**: Submit a cyclic structured step
+  graph, observe a recoverable `PLAN_STEPS_INVALID` tool result without any
+  host submission, then correct and resubmit the complete snapshot in the
+  same model turn. Verify normalized steps/design reach the host and successful
+  submission alone ends the turn for approval. Repeat with invalid design,
+  host metadata errors, and Goal metadata; none creates approval. Legacy
+  payloads and Plan/Goal execution text remain exact. Approved structured
+  revisions take precedence over mirrored Markdown, escape JSON delimiters,
+  and instruct dependency-order work and seeded TodoWrite `stepId` retention.
+  Verify `stepId` survives tool arguments and returned snapshots.
+  Runtime/unit coverage: `runtime.test.ts`, `plan-submission.test.ts`,
+  `approved-plan-instruction.test.ts`, and `runtime-todos.test.ts` under
+  `packages/agent-runtime/src/`. Full cross-process structured-plan acceptance
+  remains part of the Interactive Plan integration candidate.
 - **Status**: Automated (passed 2026-08-05): `test:e2e:plan` verifies the Host
   artifact/approval lifecycle. The optional live `test:e2e:plan-ui` case
   requires an env-provided OpenAI-compatible provider; the authorized run with
@@ -9419,6 +9531,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 | A / C / F / Quality — Tray session navigation | E2E-TRAY-bounded-session-navigation |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082, E2E-102c, E2E-102d, E2E-102e, E2E-151, E2E-154, E2E-163, E2E-166, E2E-172, E2E-174, E2E-197, E2E-005G, E2E-005J, E2E-199, E2E-201, E2E-202, E2E-203, E2E-205, E2E-206, E2E-209 |
 | C — Conversation & stream | E2E-CHAT-long-history-stream-keeps-responsive, E2E-CHAT-running-status-survives-output-pauses, E2E-008, E2E-008d, E2E-008e, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-COMPOSER-narrow-controls, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-218, E2E-259, E2E-219, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-161, E2E-162, E2E-166, E2E-172, E2E-173, E2E-174, E2E-177, E2E-178, E2E-179, E2E-180, E2E-182, E2E-183, E2E-187, E2E-198, E2E-199, E2E-202, E2E-203, E2E-207, E2E-208, E2E-CHAT-content-width-handles, E2E-250, E2E-102i, E2E-PLUGIN-session-orchestrator-real-workers, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-SUBAGENT-resume-a-settled-delegation |
+| C — Conversation & stream (Interactive Plan progress) | E2E-PLAN-step-progress-and-graph |
 | C — Conversation & stream (composer drafts) | E2E-011c, E2E-011c-1 |
 | D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078, E2E-153, E2E-158, E2E-182, E2E-187, E2E-252 |
 | D — Workspace (project ordering) | E2E-253 |
@@ -16741,3 +16854,53 @@ host-created files. The full app's file-preview viewer is covered separately.
   image model selection and provider configuration remain available.
 - Coverage: recent-models.test.mjs, recent-model-flow.test.mjs,
   default-model-picker.test.mjs, and scripts/e2e-composer-model-selection.mjs.
+
+## Interactive Plan host scenarios
+
+- **Preconditions**: Built protocol 12 host and JS packages; each scenario uses
+  an isolated temporary host profile and workspace. No provider, live model,
+  Electron instance, or user data is involved.
+- **Runner**: `cargo build -p host-core --locked && pnpm build:js && node scripts/e2e-plan.mjs`.
+  Cases use the existing host JSON-RPC harness and `record()` summary, with
+  fixtures in `scripts/e2e/interactive-plan.mjs`.
+- **Specs linked**: [Interactive Plan metadata](../03-runtime/interactive-plan-metadata.md).
+- **Acceptance**: E (tool/approval boundaries), F (persistence), H (diagnostics).
+- **Milestone**: Interactive Plan.
+- **Status**: Automated host-process/filesystem scenarios. Renderer editing and
+  sidecar model-instruction rendering are outside this runner's scope.
+
+| Case ID | Steps and expected result |
+| --- | --- |
+| `E2E-PLAN-METADATA-submit-normalizes-steps-and-design` | Submit steps/design, end the planning turn, read `plans.get` and `plans.pending`: titles/IDs/fonts/keywords are trimmed, slugs lowercased, colors uppercased, empty detail/color groups omitted. Artifact bytes, size, hash, and Markdown snapshots remain exact. |
+| `E2E-PLAN-METADATA-invalid-submit-publishes-nothing` | Submit cyclic steps, then an invalid design color: return `PLAN_STEPS_INVALID` / `PLAN_DESIGN_INVALID`; after each failure no artifact or pending proposal exists and the session remains planning. |
+| `E2E-PLAN-METADATA-goal-rejects-structured-metadata` | Enter Goal and submit steps: return `PLAN_METADATA_UNSUPPORTED` without artifact or pending proposal publication. |
+| `E2E-PLAN-METADATA-approval-revision-seeds-checklist` | Seed an existing checklist via `TodoWrite`, submit, end the turn, then approve with an added/deleted step, changed dependency, and revised keywords/color/font/library. `plans.get` preserves submitted metadata and stores resolved metadata; queued and claimed executions carry the effective revision. `todos.get` returns one pending/medium item per effective step in input order with `stepId`, advances revision once, and matches the committed `todos.changed` snapshot. Artifact bytes remain unchanged. |
+| `E2E-PLAN-METADATA-approval-replay-is-idempotent` | Reject a pending proposal with either revision field: `PLAN_INVALID_ARGUMENT`, proposal unchanged. Approve, replay identical and equivalently normalized revisions: same result, checklist unchanged, no new `todos.changed`. Change steps or design in a replay: `PLAN_APPROVAL_CONFLICT`, no mutation. |
+| `E2E-PLAN-METADATA-omitted-revision-and-legacy-plans` | Approve with revisions omitted: submitted steps seed the checklist and submitted metadata reaches execution. Then seed a legacy session via `TodoWrite` and approve a proposal without metadata: checklist including revision/timestamp stays unchanged, no todo notification, metadata fields remain absent, artifact bytes stay exact. |
+| `E2E-PLAN-METADATA-cleared-steps-keep-checklist` | Seed a checklist, submit steps/design, approve with `revisedSteps: []`: `plans.get` retains explicit `resolvedSteps: []` and original submitted steps; execution omits steps but keeps submitted design. Existing checklist/revision/timestamp remain unchanged, no todo notification or artifact rewrite. |
+
+## Interactive Plan UI scenarios
+
+Electron renderer scenarios for the interactive Plan tab. They cover the
+structured step and design editors behind real DOM interactions, the draft
+dependency graph, the tab-level Build with the Ask default, and checklist
+progress rendering after approval.
+
+- **Preconditions**: Built JS packages, Electron main/renderer bundles, and a
+  debug host-core binary; `PI_DESKTOP_PLAN_UI_PROBE=1` so the Electron Main
+  probe is installed; an isolated temporary profile, data directory, and
+  workspace; no provider or live model. English labels are required, so the
+  case sets the language before it starts.
+- **Runner**: `cargo build -p host-core --locked && pnpm build:js && (cd apps/desktop && pnpm exec electron-vite build) && xvfb-run -a node scripts/e2e-plan-ui.mjs`.
+  Required case `E2E-PLAN-interactive-tab-edit-build-progress` runs inside the
+  existing plan-UI harness (`scripts/e2e-plan-ui.mjs`) with the case body in
+  `scripts/e2e/plan-ui-interactive.mjs`.
+- **Specs linked**: [Interactive Plan metadata](../03-runtime/interactive-plan-metadata.md),
+  [Product spec](../01-product/01-product-scope.md).
+- **Acceptance**: C (conversation), F (persistence), Quality.
+- **Milestone**: Interactive Plan.
+- **Status**: Automated.
+
+| Case ID | Steps and expected result |
+| --- | --- |
+| `E2E-PLAN-interactive-tab-edit-build-progress` | Seed a Plan session and submit a proposal with four steps (s3 depends on s1+s2, s4 on s3) and a design spec through the probe's `submit` op with `steps`/`design`; the probe echo carries the host-normalized steps/design. Reload, select the session, and open the Plan tab via the approval bar. Through real DOM events: rename s2, delete s4, add a step, and set its dependency on s3; open s1's dependency picker and confirm the s3 option is disabled with "Would create a cycle"; edit the design (remove a keyword, add one, change a primary color, font family, and component library). The draft graph shows 4 nodes, 3 edited edges, and a dep chip naming s3. Click tab `Build` with the Ask default: the session enters Agent mode, `plans.get` returns `resolvedSteps`/`resolvedDesign` equal to the edited revision, and `todos.get` seeds one pending item per step in order with `stepId`. Push TodoWrite progress on the still-running submit turn through the probe `todo` op, settle the turn, and confirm `plan-progress` shows "1 / 4 done", step rows and graph nodes carry `data-status` (s1 completed, s3 in progress, others pending), and the tab no longer renders editable controls. The post-approval launch failure may surface only the expected provider-not-configured diagnostic. Screenshots: `plan-tab-opened`, `plan-steps-edited`, `plan-design-edited`, `plan-graph-draft`, `plan-progress`, `plan-graph-progress`. |

@@ -673,8 +673,27 @@ requires a persisted session workspace for its approval artifact.
 explains how to bind a workspace and directs the agent to present the proposal
 in chat without retrying until a workspace is bound. It does not terminate the
 model loop, create an approval, or authorize execution. Successful submission
-still terminates for approval; other submission failures retain their existing
-termination behavior.
+still terminates for approval. Interactive Plan metadata errors
+`PLAN_STEPS_INVALID`, `PLAN_DESIGN_INVALID`, and `PLAN_METADATA_UNSUPPORTED`
+are also recoverable without `terminate`, whether detected by shared runtime
+validators before host submission or returned by the host. The result includes
+the validation message and directs the model to fix the structured field and
+resubmit the complete snapshot in the same turn; no approval was created.
+Other submission failures retain their existing termination behavior.
+
+`SubmitPlan` accepts optional structured `steps` and `design` alongside the
+unchanged Markdown. Runtime validation normalizes these fields; empty steps
+and design normalized to `{}` are omitted from `plans.submit`. Legacy calls
+send the same parameters as before. `SubmitGoal` keeps its existing schema and
+rejects either metadata field with `PLAN_METADATA_UNSUPPORTED`.
+
+Approved Plan execution appends non-empty effective steps/design after the
+exact approved Markdown and before the implementation instruction. These
+JSON sections escape `<`, `>`, and `&` and explicitly take precedence over
+mirrored Markdown sections as the user's approved revision. The Agent works
+in dependency order, preserves seeded checklist `stepId` values through
+`TodoWrite`, verifies completion, and applies design constraints to UI work.
+Without effective metadata, Plan and Goal instructions remain byte-identical.
 
 Approval has only `approve` and `reject`. Approval commits `mode = agent`, the
 explicit permission mode, an execution ID, and `execution_state = queued` on
@@ -1517,6 +1536,14 @@ After reject, expiry, or interruption, the Agent may revise in the new turn and
 must follow the same one-SubmitPlan rule. It must not claim that changes were
 made. The host writes the immutable `.pi/plan/*.md` artifact; the Agent does
 not write or edit it itself and does not receive a request-changes flow.
+
+Plans with three or more concrete implementation steps also supply structured
+`steps` with kebab-case ids and `dependsOn` ordering, mirrored in a Markdown
+"Steps" section. Only tasks creating or substantially redesigning UI supply
+`design` (style keywords, typography, #RRGGBB color groups, framework/component
+library), mirrored in a "Design" section. A `PLAN_STEPS_INVALID` or
+`PLAN_DESIGN_INVALID` result is an exception to the one-submit rule: fix the
+structured field and resubmit the full snapshot in the same turn.
 
 The prompt may describe Bash as permission-gated and potentially mutating. It
 must not describe Plan as a strict read-only security boundary.

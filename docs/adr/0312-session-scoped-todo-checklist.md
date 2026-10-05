@@ -4,6 +4,7 @@
 - Date: 2026-09-29
 - Deciders: PI-Desktop maintainers
 - Related: Issue #1177
+- Amended by: ADR interactive-plan-structured-revision (approval-time checklist seeding and `TodoWrite` step identity)
 
 ## Context
 

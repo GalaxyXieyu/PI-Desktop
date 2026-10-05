@@ -178,7 +178,7 @@ PRAGMA trusted_schema = ON;       -- required by the FTS triggers (§4.8); the D
 PRAGMA auto_vacuum = INCREMENTAL; -- set at creation, before any table
 ```
 
-- 架构版本位于 `PRAGMA user_version` (v15 = `15`) 中。 v1 `meta`
+- 架构版本位于 `PRAGMA user_version` (v22 = `22`) 中。 v1 `meta`
   桌子不见了。
 - host-core 是**单一作者**；语句使用 `prepare_cached`；每个
   多行写入在一个事务中运行。
@@ -512,7 +512,11 @@ CREATE TABLE plan_approvals (
   execution_id             TEXT UNIQUE,
   execution_state          TEXT CHECK (execution_state IN (
     'queued', 'running', 'completed', 'interrupted'
-  ))
+  )),
+  steps_json               TEXT, -- normalized submitted Interactive Plan steps (schema v22)
+  design_json              TEXT, -- normalized submitted Interactive Plan design (schema v22)
+  resolved_steps_json      TEXT, -- normalized approval revision, explicit [] kept (schema v22)
+  resolved_design_json     TEXT  -- normalized approval revision, explicit {} kept (schema v22)
 );
 CREATE INDEX idx_plan_approvals_session
   ON plan_approvals(session_id, created_at DESC);
@@ -534,9 +538,20 @@ Plan/Goal 又创建一个新的完整 snapshot/approval 行，并且永远不会
 较早的文件。哈希值和字节大小在批准之前对文件进行身份验证，但是
 审批UI可以简单地打开相对路径。
 
+架构 v22 为交互式 Plan 增加四个可空的元数据列（ADR interactive-plan-structured-revision）：
+`steps_json` / `design_json` 保存规范化提交的结构化步骤和 UI 设计，
+`resolved_steps_json` / `resolved_design_json` 保存规范化的审批修订 ——
+显式的 `[]` / `{}` 清空保持 JSON，省略的修订保持 NULL。主机
+在写入工件之前校验并规范化元数据，因此无效提交既不留下文件也不留下
+行，且工件字节永远不会被追加或重写。有效元数据在 resolved 值非 NULL
+时取 resolved 值，否则取提交值；NULL 列在 proposal 序列化中被省略，
+因此旧有行和线材负载不变。参见
+[interactive-plan-metadata](interactive-plan-metadata.md)。
+
 批准将 `status` 更改为 `approved`，设置 `execution_id` 并
-`execution_state = 'queued'`，将 `sessions.mode` 更新为 `agent`，并存储
-一笔交易中的显式许可模式。 Reject/expiry 离开
+`execution_state = 'queued'`，将 `sessions.mode` 更新为 `agent`，存储
+显式许可模式与规范化的审批修订，并在有效步骤非空时从这些步骤
+替换会话清单，全部在一个事务中。 Reject/expiry 离开
 会话处于合约模式 — Plan 保持 Plan，Goal 保持 Goal — 并关闭
 主动门；稍后的提示可以创建新的待处理行。新协议
 没有请求更改操作；兼容性列保留用于旧记录。
@@ -601,6 +616,7 @@ CREATE TABLE session_todo (
   status TEXT NOT NULL CHECK (status IN ('pending', 'in_progress', 'completed', 'cancelled')),
   priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('high', 'medium', 'low')),
   updated_at INTEGER NOT NULL,
+  step_id TEXT CHECK (step_id IS NULL OR (length(step_id) BETWEEN 1 AND 64)),
   PRIMARY KEY (session_id, position)
 );
 ```
@@ -611,7 +627,11 @@ revision，包括清空。唯一的部分 `in_progress` 索引在数据库边界
 分叉会话从 revision 0 和空清单开始；删除会话会级联删除清单行。
 
 行内容在存储前会裁剪空白，限制为 500 个 Unicode 标量值且不得包含 NUL。
-TodoWrite 是唯一写入方；渲染器和 sidecar 只能通过 host RPC 访问该状态。
+TodoWrite 是唯一的执行期写入方；Plan 审批事务是第二个主机拥有的写入方，
+它为每个已批准步骤播种一行（ADR interactive-plan-structured-revision，修订 ADR 0312）。渲染器和 sidecar
+只能通过 host RPC 访问该状态。`step_id`（架构 v22）将一行链接到
+计划步骤 id，并在一次写入内唯一；省略其 `stepId` 的 TodoWrite 项
+只有在恰好一个先前行拥有相同内容且没有其他新项认领该 id 时才会继承它。
 
 ### 4.6c 会话协作 ledger —— 宿主拥有的投递状态（架构 v16）
 
@@ -1059,8 +1079,8 @@ CREATE INDEX idx_notifications_unread
 | 上下文检查点（`session.appendCompaction`） | 在其引用的消息边界之后附加类型化检查点行 | —（检查点是不可搜索的转录本内容） |
 | 工具成功（Write/Edit） | — | upsert `artifacts` + `audit_log` 行，与结果持久化相同的 tx |
 | 通过 `session.endTurn` 打开终端 | `completed`/`error`：仅当该 id 已索引时才移除进行中检查点，否则留给 outbox 或启动恢复（D327）。`recoverInflight`：最终行从未落盘时，回合已 `completed` 则追加为 `complete`，否则为 `aborted` | 更新 `turns`；对于 completed/error，在同一交易中插入一个通知并修剪至 200 个；中止插入 无；被提升的检查点在该回合下获得一个索引行 |
-| plan/goal 提交 | 主机将准确的 Markdown 字节写入新的唯一 `<workspaceRoot>/.pi/<kind>/*.md` 文件 | 在发出批准请求之前插入一个 `plan_approvals(pending)` 行，其中包含类型、结构化 title/question、工件 path/hash/size 和到期时间 |
-| plan/goal 批准 | 验证不可变工件 path/hash/size | 原子地解析 `plan_approvals`，更新 `sessions.mode` 和显式 `permission_mode`，并设置 `execution_state = 'queued'`； reject/expiry 保持合约模式 |
+| plan/goal 提交 | 主机校验并规范化任何结构化 Plan steps/design，然后将准确的 Markdown 字节写入新的唯一 `<workspaceRoot>/.pi/<kind>/*.md` 文件 | 在发出批准请求之前插入一个 `plan_approvals(pending)` 行，其中包含类型、结构化 title/question、存在时的规范化 `steps_json`/`design_json`、工件 path/hash/size 和到期时间 |
+| plan/goal 批准 | 验证不可变工件 path/hash/size | 以 `resolved_steps_json`/`resolved_design_json` 中的规范化修订原子地解析 `plan_approvals`，更新 `sessions.mode` 和显式 `permission_mode`，设置 `execution_state = 'queued'`，并在有效步骤非空时播种会话清单； reject/expiry 保持合约模式 |
 | 转录本截断/重试/编辑 (`session.truncateFrom`) | 主机拥有的后缀截断：中止残留 running 回合，归档被丢弃的重新生成尾巴，原子前缀重写（临时+重命名）；只保留边界仍然存在的检查点 | 经 `replace_messages` 的 single tx：删除索引行，批量重新插入携带每个幸存消息所属的 `turn_id`，重置 `last_seq`；删除进行中检查点 |
 | 删除消息/无应答智能停止 (`session.replaceMessages`) | 原子记录重写（临时+重命名）；只保留边界仍然存在的检查点 | single tx：删除索引行，批量重新插入携带每个幸存消息所属的 `turn_id`，重置 `last_seq`； smart Stop 仅将其结构化输入框快照保留在渲染器内存中 |
 
@@ -1157,7 +1177,7 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
   旧文件中的会话、提供程序和设置不会保留；
   存档仍保留以供手动恢复。所有 v7 之前的迁移代码
   （v1 `settings.sqlite` 导入，v2→v6 链）被删除。
-- 全新安装直接运行完整的 v16 DDL。
+- 全新安装直接运行完整的 v22 DDL。
 - **架构 v15 是增量的。** 它增加 `turn_queue` 表及其两个索引（D386 / ADR 0213），使 Host
   拥有的回合队列在重启后存活；不改动任何已有行，迁移前保留 `pi.sqlite.v14.bak`。
 - **架构 v16 是增量的。** 它增加会话协作 link 和投递表、生命周期索引，以及可为空的
@@ -1168,6 +1188,14 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
   —— 所有 v17 之前的行保持 NULL 归属。该步骤之前保留 `pi.sqlite.v16.bak` 副本。
   v15→v16 会话协作步骤现在写入 `16`（它自己的版本）而不是最新的架构常量，
   因此 v15 文件可以在一次启动中走完两个步骤。
+- **架构 v22 是增量的（ADR interactive-plan-structured-revision）。** 它增加四个可空的 `plan_approvals`
+  元数据列（`steps_json`、`design_json`、`resolved_steps_json`、
+  `resolved_design_json`）和可空的 `session_todo.step_id`。每个既有行
+  保持 NULL 元数据且没有步骤身份，渲染效果与之前完全相同。迁移先写入
+  精确可读的 `pi.sqlite.v21.bak` 副本，在添加每一列之前探测
+  `pragma_table_info`，使部分升级或仅版本降级的文件不会被改变两次，
+  并在一个事务内最后设置 `PRAGMA user_version = 22`；
+  v20→v21→v22 链仍然受支持。
 - **架构 v7 首先到达 v8，然后使用受保护的路径。** v7→v8
   迁移之后是相同的受保护的 v8→v15 迁移；架构-v9 和
   schema-v10 数据库采用相同的受保护路径并接收精确的可读数据

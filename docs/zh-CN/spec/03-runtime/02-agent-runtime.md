@@ -497,6 +497,28 @@ Plan 和 Goal 是两种 **合约模式** (D198)。他们共用一个耐用的
 在 `plan_approvals` 中构造 title/question，并将活动状态移至
 `awaiting_approval`。
 
+Plan/Goal 入口在没有项目工作区时仍然可用。提交需要一个持久的会话
+工作区来存放其审批工件。提交返回的 `PLAN_WORKSPACE_REQUIRED` 是可恢复的
+工具错误：它说明如何绑定工作区，并指引 agent 在聊天中展示 proposal，
+在绑定工作区之前不重试。它不会终止模型循环、创建审批或授权执行。
+成功的提交仍然终止以供批准。交互式 Plan 元数据错误 `PLAN_STEPS_INVALID`、
+`PLAN_DESIGN_INVALID` 和 `PLAN_METADATA_UNSUPPORTED` 同样无需 `terminate`
+即可恢复，无论是由共享运行时校验器在主机提交之前检测到，还是由主机
+返回。结果包含校验消息，并指引模型修正结构化字段并在同一回合内
+重新提交完整快照；没有创建任何审批。其他提交失败保留其现有的终止
+行为。
+
+`SubmitPlan` 在不变的 Markdown 之外接受可选的结构化 `steps` 和 `design`。
+运行时校验规范化这些字段；空 steps 和规范化为 `{}` 的 design 会从
+`plans.submit` 中省略。旧有调用发送与之前相同的参数。`SubmitGoal` 保持其
+现有 schema，并以 `PLAN_METADATA_UNSUPPORTED` 拒绝任一元数据字段。
+
+已批准的 Plan 执行在精确的已批准 Markdown 之后、实现指令之前追加非空的
+有效 steps/design。这些 JSON 区段转义 `<`、`>` 和 `&`，并显式地优先于
+镜像的 Markdown 区段作为用户批准的修订。Agent 按依赖顺序工作，通过
+`TodoWrite` 保留播种的清单 `stepId` 值，验证完成情况，并将设计约束应用于
+UI 工作。没有有效元数据时，Plan 和 Goal 指令保持逐字节一致。
+
 仅批准 `approve` 和 `reject`。批准提交 `mode = agent`，
 显式权限模式、执行 ID 和 `execution_state = queued`
 一个主机事务中的相同 `plan_approvals` 行。的
@@ -1027,6 +1049,13 @@ Plan 提示告诉相同的 Agent 了解请求，检查
 必须遵循相同的 one-SubmitPlan 规则。它不得声称变更是
 做了。主机写入不可变的 `.pi/plan/*.md` 工件； Agent 确实
 本身不编写或编辑它，并且不接收请求更改流。
+
+具有三个或更多具体实现步骤的 Plan 还提供带 kebab-case id 和 `dependsOn`
+顺序的结构化 `steps`，并镜像到 Markdown「Steps」区段。只有创建或大幅
+重新设计 UI 的任务才提供 `design`（样式关键词、排版、#RRGGBB 颜色分组、
+框架/组件库），镜像到「Design」区段。`PLAN_STEPS_INVALID` 或
+`PLAN_DESIGN_INVALID` 结果是 one-submit 规则的例外：修正结构化字段并在
+同一回合内重新提交完整快照。
 
 该提示可能会将 Bash 描述为受权限限制且可能会发生变异。它
 不得将 Plan 描述为严格的只读安全边界。

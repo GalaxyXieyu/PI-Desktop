@@ -145,6 +145,10 @@ stdio 与 Tokio 的动态阻塞池隔离，因此后一种情况
 | `TOOL_DISABLED_IN_PLAN` | 不 | unknown/unlisted 工具的契约模式硬拒绝 |
 | `PLAN_NOT_ACTIVE` | 不 | 在没有协商合同的情况下运行了提交工具 |
 | `PLAN_KIND_MISMATCH` | 不 | Goal 模式下的 `SubmitPlan`，或 Plan 模式下的 `SubmitGoal` |
+| `PLAN_STEPS_INVALID` | 修正后可以 | 无效的步骤元数据；消息会指名字段路径和环 |
+| `PLAN_DESIGN_INVALID` | 修正后可以 | 无效的设计元数据；消息会指名字段路径 |
+| `PLAN_METADATA_UNSUPPORTED` | 不 | 为 Goal 提供了结构化 Plan 元数据或修订 |
+| `PLAN_REVISION_UNSUPPORTED` | 不 | 远程后端不支持结构化审批修订 |
 | `PLAN_APPROVAL_REQUIRED` | 不 | SubmitPlan/SubmitGoal 正在等待单独的批准 |
 | `PLAN_APPROVAL_TIMEOUT` | 不 | 绝对 30 分钟计划批准期限已过 |
 | `PLAN_APPROVAL_STALE` | 不 | 响应与实时 proposal/session/turn/tool-call/version 不匹配 |

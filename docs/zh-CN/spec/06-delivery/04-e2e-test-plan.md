@@ -155,6 +155,36 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 
 ---
 
+### E2E-PLAN-METADATA：交互式 Plan 主机元数据验收
+
+- **前提**：协议 12 主机、隔离的工作区和架构 22 数据库；一个带审批和清单行的既有架构 21 fixture 用于升级。
+- **步骤**：提交带 steps 和 design 的 Plan；重新加载 pending；批准或拒绝并通过 `plans.get` 获取它。用另一个会话获取。提交带环的 steps、无效颜色、Goal 元数据和省略/空元数据。重新打开升级后的数据库并检查原始行和工件。
+- **预期**：规范化元数据持久化并可读回；会话不匹配为 `PLAN_NOT_FOUND`；无效元数据既不创建文件也不创建行；省略/空元数据保持旧有线材形状和精确工件字节不变。升级保留 NULL 元数据行且是幂等的。
+- **链接规格**：`03-runtime/interactive-plan-metadata.md`
+- **验收标准**：主机拥有的持久化和协议正确性。
+- **里程碑**：交互式 Plan。
+- **状态**：自动化 Rust RPC/文件系统和迁移测试；实时 Electron 覆盖为 `E2E-PLAN-interactive-tab-edit-build-progress`，主机覆盖为 `E2E-PLAN-METADATA-*` 用例。
+
+### E2E-PLAN-plan-tab-document-review：只读计划文档审阅
+
+- **前提**：一个本地待批准 Plan、一个不带元数据的旧有 proposal、一个带修订的已批准 proposal，以及一个远程会话检查点。
+- **步骤**：从审批条打开文档。阅读 Markdown、design、tasks 和依赖 chips。重新打开入口、重排标签页、切换会话并返回。打开工件。决议该 proposal 并检查其有效修订。打开一个历史本地 proposal；在其读取完成前切换身份。打开带和不带存储数据的远程 proposal。Build 之后，关闭 Plan 标签页并从 SubmitPlan 历史卡片中的 View plan 重新打开它；在重启并重载转录后重复。
+- **预期**：每个 proposal 一个会话作用域标签页；既有工件和审批行为保留。旧有 proposal 没有空的元数据分区。有效修订替换提交的元数据，包括显式清空。过期读取不替换当前数据；远程标签页绝不获取。加载、失败和远程只读状态可见。关闭标签页保留其草稿；决议该 proposal 会丢弃它。SubmitGoal 卡片、Read 行、拓扑行以及没有有效 proposal 的 SubmitPlan 结果不提供 View plan。
+- **链接规格**：`03-runtime/interactive-plan-metadata.md`
+- **验收标准**：只读合约审阅与会话隔离。
+- **里程碑**：交互式 Plan。
+- **状态**：自动化 reducer、store/标签页流、SSR 和受控 hook 调度器测试（`plan-draft-model`、`plan-tab-render`、`plan-tab-loading` 和 `work-panel-tabs`）。`tool-row-plan-open` 通过 ToolRow SSR 覆盖历史卡片的 View plan 可见性。实时 Electron 的编辑器与 Build/Reject 旅程由 `E2E-PLAN-interactive-tab-edit-build-progress` 覆盖。
+
+### E2E-PLAN-step-progress-and-graph：计划进度与依赖图
+
+- **前提**：一个带菱形步骤依赖图的本地待批准 Plan、一个已批准的修订 Plan，以及一个不带 steps/design 的旧有 Plan。
+- **步骤**：打开待批准标签页，检查依赖 chips，编辑一个标题，并切换 List → Graph → List。批准修订后的计划，并通过 completed、in-progress 和 cancelled 状态更新其会话清单。再次切换视图，然后检查清单数据到达前的计划和旧有计划。
+- **预期**：Graph 在批准前使用实时草稿，批准后使用有效步骤，每个任务一个节点、每个依赖一条有向边。Chips 显示依赖的序号/标题。清单 ID 优先于标题回退；未匹配的步骤显示 pending。两个视图都保留完成计数和执行徽章。状态指示器是只读的。图公开无障碍摘要和列表回退；旧有计划不增加空分区。
+- **链接规格**：`03-runtime/interactive-plan-metadata.md`
+- **验收标准**：C——对话；只读执行合约审阅。
+- **里程碑**：交互式 Plan。
+- **状态**：自动化布局/进度单元、SSR 合约渲染和受控 List/Graph 交互测试（`plan-flowchart-layout`、`plan-step-progress`、`plan-contract-view`、`plan-view-toggle`）。实时 Electron 验证由 `E2E-PLAN-interactive-tab-edit-build-progress` 覆盖。
+
 ## 4. 工具意图
 
 | 工具 | 目的 | 状态 |
@@ -4111,6 +4141,33 @@ eleven-tool-round desktop paths are verified by
   精确可读的备份、故障关闭回滚、重新启动、转录、设置、
   计划模式、批准字段和索引测试
 
+#### E2E-PLAN-METADATA：已批准结构保留显式用户修订
+
+- **前提**：带隔离 host/工作区的协议 v12 任务候选；确定性 provider
+  fixture，不使用付费端点或用户桌面。
+- **步骤**：提交一个旧有 Plan，然后一个带依赖菱形和 design 的 Plan。
+  编辑元数据并批准，通过 `plans.get` 查询，并检查执行描述符。
+  用省略修订和显式 `[]`/`{}` 清空重复。提交格式错误的元数据、重复依赖、
+  环和超限 UTF-8 JSON；在 Goal 上尝试元数据、在拒绝上尝试修订。
+- **预期**：旧有形状/行为和工件字节保持不变。修订仅在存在时生效；
+  显式清空禁用有效元数据。校验错误在任何写入之前指名其路径（和
+  环路径）。Goal 元数据和 reject 修订失败且不改变审批状态。经
+  渲染器/preload/Main，规范化审批修订到达 host RPC，而无效修订
+  不产生 host 调用。`plans.get` 只转发已校验的 session/proposal ID；
+  proposal 和事件元数据在规范化后存活。已注册远程会话以
+  `PLAN_REVISION_UNSUPPORTED` 拒绝修订、以 `UNSUPPORTED` 拒绝查询，
+  不发生远程 I/O 也不回落到本地。格式错误的存在执行元数据在
+  host-runtime 解码器中失败关闭。
+- **链接规格**：`03-runtime/06-host-rpc-protocol.md`、
+  `03-runtime/08-error-codes.md`。
+- **验收**：F（合约保留）、H（诊断）。
+- **里程碑**：交互式 Plan。
+- **状态**：共享校验器和有效合约流由 `plan-steps.test.ts` 和
+  `plan-design.test.ts` 单元覆盖。传输/解码覆盖位于
+  `interactive-plan-ipc.test.mjs`、`remote-backend.test.mjs` 和 host-runtime
+  `plan-execution.test.ts`；完整跨进程验收等待集成的
+  host/runtime/UI 候选。
+
 #### E2E-105：Plan 策略仍然具有主机权威
 
 - **先决条件**：项目绑定会话在 Plan 和 BrowserPreview 中处于空闲状态，
@@ -4127,6 +4184,18 @@ eleven-tool-round desktop paths are verified by
   `03-runtime/06-host-rpc-protocol.md`、`05-security/01-security.md`、ADR 0053
 - **接受**：E（工具和权限）、安全
 - **里程碑**：M6
+- **交互式 Plan 运行时扩展**：提交一个带环的结构化步骤图，观察一个
+  可恢复的 `PLAN_STEPS_INVALID` 工具结果且没有主机提交，然后修正并在
+  同一模型回合内重新提交完整快照。验证规范化 steps/design 到达
+  主机，并且仅成功提交结束回合进入审批。用无效 design、主机
+  元数据错误和 Goal 元数据重复；都不会创建审批。旧有负载和
+  Plan/Goal 执行文本保持精确。已批准的结构化修订优先于镜像
+  Markdown、转义 JSON 分隔符，并指示按依赖顺序工作和保留播种的
+  TodoWrite `stepId`。验证 `stepId` 在工具参数和返回快照中存活。
+  运行时/单元覆盖：`packages/agent-runtime/src/` 下的 `runtime.test.ts`、
+  `plan-submission.test.ts`、`approved-plan-instruction.test.ts` 和
+  `runtime-todos.test.ts`。完整跨进程结构化 plan 验收仍是交互式 Plan
+  集成候选的一部分。
 - **状态**：自动（2026-08-04 通过）：`test:e2e:plan` 加 host-core
   permission/policy 和代理运行时工具组合测试
 
@@ -5585,6 +5654,7 @@ eleven-tool-round desktop paths are verified by
 | A — 应用程序启动 | E2E-001、E2E-002、E2E-003、E2E-004、E2E-067、E2E-076、E2E-079、E2E-092、E2E-097、E2E-143、E2E-150、E2E-168、E2E-204、E2E-217 |
 | B——模型配置 | E2E-005、E2E-005G、E2E-006、E2E-007、E2E-038、E2E-050、E2E-052、E2E-055、E2E-066、E2E-080、E2E-082、E2E-151、E2E-005J、E2E-199、E2E-201、E2E-202、E2E-203、E2E-209、E2E-166 |
 | C — 对话和直播 | E2E-CHAT-running-status-survives-output-pauses、E2E-008、E2E-008d、E2E-008a、E2E-009、E2E-010、E2E-011、E2E-011a、E2E-011b、E2E-031、E2E-040、E2E-047、E2E-048、E2E-048c、E2E-048A、E2E-049、E2E-052、 E2E-053、E2E-054、E2E-055、E2E-059、E2E-059a、E2E-060c、E2E-060d、E2E-061、E2E-061a、E2E-062、E2E-064、E2E-065、E2E-068、E2E-071、 E2E-073、E2E-074、E2E-075、E2E-081、E2E-083、E2E-084、E2E-086、E2E-087、E2E-088、E2E-088b、E2E-089、E2E-090、E2E-094、E2E-095、E2E-096、 E2E-097、E2E-098、E2E-099、E2E-102、E2E-102a、E2E-102b、E2E-106、E2E-109、E2E-111、E2E-114、E2E-116、E2E-117、E2E-118、E2E-119、 E2E-120、E2E-121、E2E-代理-001、E2E-142、E2E-144、E2E-145、E2E-146、E2E-147、E2E-151、E2E-199、E2E-250、E2E-166、E2E-SUBAGENT-resume-a-settled-delegation |
+| C — 对话和直播（交互式 Plan 进度） | E2E-PLAN-step-progress-and-graph |
 | C — 对话和直播（输入框草稿） | E2E-011c、E2E-011c-1 |
 | A / C / F / Quality — Tray session navigation | E2E-TRAY-bounded-session-navigation |
 | D——工作区 | E2E-012、E2E-013、E2E-022B、E2E-024I、E2E-047、E2E-049、E2E-057、E2E-058、E2E-060、E2E-068、E2E-075、E2E-078、E2E-153 |
@@ -9410,3 +9480,50 @@ preload, API normalization, store events, ToolRow, and Markdown renderer.
 No provider credentials or paid model calls are required. The fixture ends at
 work-panel file-request routing; artifact bytes are verified from the real
 host-created files. The full app's file-preview viewer is covered separately.
+
+## 交互式 Plan 主机场景
+
+- **前提**：已构建的协议 12 主机和 JS 包；每个场景使用隔离的临时主机
+  profile 和工作区。不涉及 provider、实时模型、Electron 实例或用户数据。
+- **运行器**：`cargo build -p host-core --locked && pnpm build:js && node scripts/e2e-plan.mjs`。
+  用例使用既有 host JSON-RPC 线束和 `record()` 摘要，fixture 位于
+  `scripts/e2e/interactive-plan.mjs`。
+- **链接规格**：[交互式 Plan 元数据](../03-runtime/interactive-plan-metadata.md)。
+- **验收**：E（工具/审批边界）、F（持久化）、H（诊断）。
+- **里程碑**：交互式 Plan。
+- **状态**：自动化主机进程/文件系统场景。渲染器编辑和 sidecar 模型
+  指令渲染不在该运行器范围内。
+
+| 用例 ID | 步骤和预期结果 |
+| --- | --- |
+| `E2E-PLAN-METADATA-submit-normalizes-steps-and-design` | 提交 steps/design，结束规划回合，读取 `plans.get` 和 `plans.pending`：title/ID/字体/关键词被修剪，slug 小写化，颜色大写化，空 detail/颜色分组被省略。工件字节、大小、哈希和 Markdown 快照保持精确。 |
+| `E2E-PLAN-METADATA-invalid-submit-publishes-nothing` | 提交带环的 steps，然后一个无效 design 颜色：返回 `PLAN_STEPS_INVALID` / `PLAN_DESIGN_INVALID`；每次失败后不存在工件或待批准 proposal，且会话保持 planning。 |
+| `E2E-PLAN-METADATA-goal-rejects-structured-metadata` | 进入 Goal 并提交 steps：返回 `PLAN_METADATA_UNSUPPORTED`，不发布工件或待批准 proposal。 |
+| `E2E-PLAN-METADATA-approval-revision-seeds-checklist` | 通过 `TodoWrite` 播种一个既有清单，提交，结束回合，然后带新增/删除步骤、变更的依赖和修订的关键词/颜色/字体/库批准。`plans.get` 保留提交的元数据并存储 resolved 元数据；排队和认领的执行携带有效修订。`todos.get` 按输入顺序为每个有效步骤返回一个带 `stepId` 的 pending/medium 项，revision 前进一次，并匹配已提交的 `todos.changed` 快照。工件字节保持不变。 |
+| `E2E-PLAN-METADATA-approval-replay-is-idempotent` | 带任一修订字段拒绝待批准 proposal：`PLAN_INVALID_ARGUMENT`，proposal 不变。批准、重放相同和等效规范化的修订：结果相同，清单不变，没有新的 `todos.changed`。在重放中变更 steps 或 design：`PLAN_APPROVAL_CONFLICT`，无任何变更。 |
+| `E2E-PLAN-METADATA-omitted-revision-and-legacy-plans` | 省略修订批准：提交的 steps 播种清单，提交的元数据到达执行。然后通过 `TodoWrite` 播种一个旧有会话并批准不带元数据的 proposal：清单（包括 revision/时间戳）保持不变，无 todo 通知，元数据字段保持缺失，工件字节保持精确。 |
+| `E2E-PLAN-METADATA-cleared-steps-keep-checklist` | 播种一个清单，提交 steps/design，带 `revisedSteps: []` 批准：`plans.get` 保留显式的 `resolvedSteps: []` 和原始提交 steps；执行省略 steps 但保留提交的 design。既有清单/revision/时间戳保持不变，无 todo 通知或工件重写。 |
+
+## 交互式 Plan UI 场景
+
+交互式 Plan 标签页的 Electron 渲染器场景。它们通过真实 DOM 交互
+覆盖结构化步骤和 design 编辑器、草稿依赖图、带 Ask 默认值的标签页级
+Build，以及批准后的清单进度渲染。
+
+- **前提**：已构建的 JS 包、Electron main/renderer 包和 debug host-core
+  二进制；`PI_DESKTOP_PLAN_UI_PROBE=1` 以安装 Electron Main 探针；隔离的
+  临时 profile、数据目录和工作区；不使用 provider 或实时模型。需要英文
+  标签，因此用例在开始前设置语言。
+- **运行器**：`cargo build -p host-core --locked && pnpm build:js && (cd apps/desktop && pnpm exec electron-vite build) && xvfb-run -a node scripts/e2e-plan-ui.mjs`。
+  必需用例 `E2E-PLAN-interactive-tab-edit-build-progress` 在既有 plan-UI
+  线束（`scripts/e2e-plan-ui.mjs`）内运行，用例主体位于
+  `scripts/e2e/plan-ui-interactive.mjs`。
+- **链接规格**：[交互式 Plan 元数据](../03-runtime/interactive-plan-metadata.md)、
+  [产品规格](../01-product/01-product-scope.md)。
+- **验收**：C（对话）、F（持久化）、Quality。
+- **里程碑**：交互式 Plan。
+- **状态**：自动化。
+
+| 用例 ID | 步骤和预期结果 |
+| --- | --- |
+| `E2E-PLAN-interactive-tab-edit-build-progress` | 播种一个 Plan 会话并通过探针的 `submit` 操作带 `steps`/`design` 提交一个含四个步骤（s3 依赖 s1+s2，s4 依赖 s3）和 design 规格的 proposal；探针回显携带主机规范化的 steps/design。重载、选择会话并通过审批条打开 Plan 标签页。通过真实 DOM 事件：重命名 s2、删除 s4、添加一个步骤并将其依赖设为 s3；打开 s1 的依赖选择器并确认 s3 选项因「会造成环」而禁用；编辑 design（移除一个关键词、添加一个、变更一个 primary 颜色、字体家族和组件库）。草稿图显示 4 个节点、3 条编辑后的边和一个指名 s3 的依赖 chip。以 Ask 默认值点击标签页 `Build`：会话进入 Agent 模式，`plans.get` 返回等于已编辑修订的 `resolvedSteps`/`resolvedDesign`，`todos.get` 按顺序为每个步骤播种一个带 `stepId` 的 pending 项。通过探针 `todo` 操作在仍在运行的提交回合上推进 TodoWrite 进度，结算回合，并确认 `plan-progress` 显示「1 / 4 done」、步骤行和图节点带 `data-status`（s1 completed、s3 in progress、其余 pending），且标签页不再渲染可编辑控件。批准后启动失败只可能显示预期的 provider-not-configured 诊断。截图：`plan-tab-opened`、`plan-steps-edited`、`plan-design-edited`、`plan-graph-draft`、`plan-progress`、`plan-graph-progress`。 |

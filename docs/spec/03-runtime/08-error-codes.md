@@ -143,6 +143,10 @@ does not turn temporary thread pressure into a host process exit.
 | `TOOL_DISABLED_IN_PLAN` | no | contract-mode hard-deny for an unknown/unlisted tool |
 | `PLAN_NOT_ACTIVE` | no | a submit tool ran while no contract was being negotiated |
 | `PLAN_KIND_MISMATCH` | no | `SubmitPlan` in Goal mode, or `SubmitGoal` in Plan mode |
+| `PLAN_STEPS_INVALID` | after correction | invalid step metadata; message names the field path and any cycle |
+| `PLAN_DESIGN_INVALID` | after correction | invalid design metadata; message names the field path |
+| `PLAN_METADATA_UNSUPPORTED` | no | structured Plan metadata or revisions supplied for a Goal |
+| `PLAN_REVISION_UNSUPPORTED` | no | structured approval revisions are unsupported by the remote backend |
 | `PLAN_APPROVAL_REQUIRED` | no | SubmitPlan/SubmitGoal is waiting for a separate approval |
 | `PLAN_APPROVAL_TIMEOUT` | no | absolute 30-minute plan approval deadline expired |
 | `PLAN_APPROVAL_STALE` | no | response does not match the live proposal/session/turn/tool-call/version |
