@@ -74,6 +74,14 @@ pub struct PlanProposal {
     pub execution_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub execution_state: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub steps: Option<Vec<PlanStep>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub design: Option<PlanDesign>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolved_steps: Option<Vec<PlanStep>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolved_design: Option<PlanDesign>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -90,6 +98,10 @@ pub struct PlanExecution {
     pub artifact: PlanArtifact,
     pub target_permission_mode: String,
     pub state: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub steps: Option<Vec<PlanStep>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub design: Option<PlanDesign>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -101,6 +113,9 @@ pub struct PlanResolution {
     pub target_permission_mode: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub execution: Option<PlanExecution>,
+    /// True only for the call that committed checklist seeding, never a replay.
+    #[serde(skip)]
+    pub seeded_todos: bool,
 }
 
 #[derive(Debug, Default)]
@@ -116,6 +131,8 @@ pub struct PlanSubmitParams<'a> {
     pub title: &'a str,
     pub markdown: &'a str,
     pub question: &'a str,
+    pub steps: Option<&'a serde_json::Value>,
+    pub design: Option<&'a serde_json::Value>,
 }
 
 pub struct PlanResolveParams<'a> {
@@ -127,6 +144,8 @@ pub struct PlanResolveParams<'a> {
     pub version: Option<i64>,
     pub action: &'a str,
     pub target_permission_mode: Option<&'a str>,
+    pub revised_steps: Option<&'a serde_json::Value>,
+    pub revised_design: Option<&'a serde_json::Value>,
 }
 
 /// Authoritative display metadata for one immutable submission in a history page.

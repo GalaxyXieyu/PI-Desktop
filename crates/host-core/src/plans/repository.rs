@@ -1,11 +1,12 @@
 use super::*;
 
-// `kind` is appended last so the historical column indexes stay stable.
+// New columns are appended so the historical column indexes stay stable.
 pub(crate) const PROPOSAL_COLUMNS: &str = "request_id, session_id, turn_id, tool_call_id,
     plan_json, title, question, status, created_at, updated_at, expires_at,
     resolved_at, action, target_permission_mode, feedback, error_code,
     artifact_relative_path, artifact_sha256, artifact_size_bytes, version,
-    execution_id, execution_state, kind";
+    execution_id, execution_state, kind,
+    steps_json, design_json, resolved_steps_json, resolved_design_json";
 
 pub(crate) fn proposal_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PlanProposal> {
     let artifact_path: Option<String> = row.get(16)?;
@@ -50,7 +51,41 @@ pub(crate) fn proposal_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Pla
         version: row.get(19)?,
         execution_id: row.get(20)?,
         execution_state: row.get(21)?,
+        steps: metadata_from_row(row, 23, metadata::normalize_steps)?,
+        design: metadata_from_row(row, 24, metadata::normalize_design)?,
+        resolved_steps: metadata_from_row(row, 25, metadata::normalize_steps)?,
+        resolved_design: metadata_from_row(row, 26, metadata::normalize_design)?,
     })
+}
+
+fn metadata_from_row<T>(
+    row: &rusqlite::Row<'_>,
+    index: usize,
+    normalize: impl FnOnce(&serde_json::Value) -> Result<T>,
+) -> rusqlite::Result<Option<T>> {
+    let Some(raw) = row.get::<_, Option<String>>(index)? else {
+        return Ok(None);
+    };
+    match serde_json::from_str(&raw)
+        .map_err(anyhow::Error::from)
+        .and_then(|value| normalize(&value))
+    {
+        Ok(value) => Ok(Some(value)),
+        Err(_) => {
+            // Never log metadata or parser errors, which can include plan text.
+            tracing::warn!(column_index = index, "invalid stored plan metadata");
+            Ok(None)
+        }
+    }
+}
+
+impl PlanManager {
+    pub fn get(&self, db: &Database, session_id: &str, proposal_id: &str) -> Result<PlanProposal> {
+        expire_pending_approvals(db)?;
+        get_proposal(db, proposal_id)?
+            .filter(|proposal| proposal.session_id == session_id)
+            .ok_or_else(|| plan_error("PLAN_NOT_FOUND"))
+    }
 }
 
 pub(crate) fn get_proposal(db: &Database, id: &str) -> Result<Option<PlanProposal>> {
@@ -102,7 +137,7 @@ pub(crate) fn history_for_tool_calls(
             WHERE newer.session_id = history.session_id
               AND COALESCE(newer.kind, 'plan') = COALESCE(history.kind, 'plan')
               AND newer.rowid > history.rowid
-        ) FROM plan_approvals history
+        ) AS superseded FROM plan_approvals history
         WHERE session_id = ?1 AND tool_call_id IN (SELECT value FROM json_each(?2))
         ORDER BY rowid"
     );
@@ -111,7 +146,7 @@ pub(crate) fn history_for_tool_calls(
     let entries = statement.query_map(params![session_id, ids], |row| {
         Ok(PlanHistoryEntry {
             proposal: proposal_from_row(row)?,
-            superseded: row.get(23)?,
+            superseded: row.get("superseded")?,
         })
     })?;
     Ok(entries.collect::<rusqlite::Result<Vec<_>>>()?)

@@ -1,5 +1,5 @@
 import { expandMcpInvocation } from "../composer-mcp";
-import { IPC, ErrorCodes, compactionRecordId, findSkillMentions, isGlobalPermissionMode, isRpcTimeoutError, type AgentEventEnvelope, type AgentPromptRequest, type AgentSteerRequest, type UiMessage, type AgentQueuePushRequest, type AgentStopRequest, type AskToolResolution, type GlobalPermissionMode, type MessageUsage, type PendingInteractiveRequests, type PlanExecutionFinishStatus, type PlanResolutionResult, type PlanResolveRequest, type PromptEnhancementRequest, type SessionSummarizeTitleRequest, type VoiceOrigin, canonicalThinkingLevel, type ThinkingLevel } from "@pi-desktop/shared";
+import { IPC, ErrorCodes, compactionRecordId, findSkillMentions, isGlobalPermissionMode, validatePlanSteps, validatePlanDesign, type PlansGetRequest, isRpcTimeoutError, type AgentEventEnvelope, type AgentPromptRequest, type AgentSteerRequest, type UiMessage, type AgentQueuePushRequest, type AgentStopRequest, type AskToolResolution, type GlobalPermissionMode, type MessageUsage, type PendingInteractiveRequests, type PlanExecutionFinishStatus, type PlanResolutionResult, type PlanResolveRequest, type PromptEnhancementRequest, type SessionSummarizeTitleRequest, type VoiceOrigin, canonicalThinkingLevel, type ThinkingLevel } from "@pi-desktop/shared";
 import type { FinishTurn } from "../runtime/plans";
 import { expandSlashInvocation, enhancePromptDraft, summarizeSessionTitle, visionFromModelConfig, type ComposerTemplate, type RuntimeProviderConfig } from "@pi-desktop/agent-runtime";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
@@ -934,6 +934,18 @@ export function registerAgentIpc({
     });
   });
 
+  handle(IPC.invoke.plansGet, async (input: PlansGetRequest) => {
+    if (!host) throw new Error("host unavailable");
+    const sessionId = typeof input?.sessionId === "string" ? input.sessionId.trim() : "";
+    const proposalId = typeof input?.proposalId === "string" ? input.proposalId.trim() : "";
+    if (!sessionId || !proposalId) {
+      throw Object.assign(new Error("sessionId and proposalId must be non-empty strings"), {
+        errorCode: ErrorCodes.PLAN_INVALID_ARGUMENT,
+      });
+    }
+    return host.call("plans.get", { sessionId, proposalId });
+  });
+
   handle(IPC.invoke.plansResolve, async (resolution: PlanResolveRequest) => {
     if (!host) throw new Error("host unavailable");
     const proposalId = String(resolution?.proposalId ?? "").trim();
@@ -947,6 +959,24 @@ export function registerAgentIpc({
     const action = resolution?.action;
     if (action !== "approve" && action !== "reject") {
       throw new Error("invalid plan approval action");
+    }
+    const revisions: Pick<PlanResolveRequest, "revisedSteps" | "revisedDesign"> = {};
+    if (action === "reject" && (resolution.revisedSteps !== undefined || resolution.revisedDesign !== undefined)) {
+      throw Object.assign(new Error("Plan revisions require approval"), {
+        errorCode: ErrorCodes.PLAN_INVALID_ARGUMENT,
+      });
+    }
+    if (action === "approve") {
+      if (resolution.revisedSteps !== undefined) {
+        const result = validatePlanSteps(resolution.revisedSteps);
+        if (!result.ok) throw Object.assign(new Error(result.message), { errorCode: result.code });
+        revisions.revisedSteps = result.value;
+      }
+      if (resolution.revisedDesign !== undefined) {
+        const result = validatePlanDesign(resolution.revisedDesign);
+        if (!result.ok) throw Object.assign(new Error(result.message), { errorCode: result.code });
+        revisions.revisedDesign = result.value;
+      }
     }
     let targetPermissionMode: GlobalPermissionMode | undefined;
     if (action === "approve") {
@@ -971,6 +1001,7 @@ export function registerAgentIpc({
       action,
       ...(version !== undefined ? { version } : {}),
       ...(targetPermissionMode ? { targetPermissionMode } : {}),
+      ...revisions,
     });
     agentHostBridge?.settleApproval(proposalId, {
       decision: action,

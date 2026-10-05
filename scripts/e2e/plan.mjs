@@ -23,6 +23,7 @@ export async function submitPlan(
   title,
   markdown,
   question,
+  metadata = {},
 ) {
   const response = await host.call("plans.submit", {
     sessionId,
@@ -31,6 +32,7 @@ export async function submitPlan(
     title,
     markdown,
     question,
+    ...metadata,
   });
   assert(response?.status === "pending", "plans.submit failed: " + shortJson(response));
   assert(

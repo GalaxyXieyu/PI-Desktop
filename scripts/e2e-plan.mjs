@@ -24,6 +24,7 @@ import {
 } from "./e2e/assert.mjs";
 import { resolveHostBinary } from "./e2e/host.mjs";
 import { withScenario } from "./e2e/fixture.mjs";
+import { interactivePlanScenarios } from "./e2e/interactive-plan.mjs";
 import { waitFor } from "./e2e/wait.mjs";
 import {
   beginTurn,
@@ -44,7 +45,7 @@ import {
   resolvePluginExecution,
   waitForPluginExecution,
 } from "./e2e/plugin.mjs";
-const PROTOCOL_VERSION = 11;
+const PROTOCOL_VERSION = 12;
 const PLAN_APPROVAL_TIMEOUT_MS = 30 * 60 * 1000;
 const LONG_TIMEOUT_ENABLED = process.env.PI_DESKTOP_E2E_LONG_TIMEOUT === "1";
 
@@ -1009,6 +1010,9 @@ async function main() {
     await runScenario("E2E-114", () => scenario114(binary, tempRoot));
     await runScenario("E2E-115", () => scenario115(binary, tempRoot));
     await runScenario("E2E-116", () => scenario116(binary, tempRoot));
+    for (const [id, scenario] of interactivePlanScenarios) {
+      await runScenario(id, () => scenario(binary, tempRoot));
+    }
   } finally {
     await rm(tempRoot, { recursive: true, force: true, maxRetries: 8, retryDelay: 100 });
   }

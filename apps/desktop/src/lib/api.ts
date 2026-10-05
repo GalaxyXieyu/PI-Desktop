@@ -100,6 +100,8 @@ import type {
   ReviewRollbackResult,
   PlanProposal,
   PlanResolveRequest,
+  PlansGetRequest,
+  PlansGetResult,
   PlanResolutionResult,
   PlanningStateEvent,
   PlansPendingResult,
@@ -987,6 +989,11 @@ export const api = {
       IPC.invoke.plansPending,
       sessionId ? { sessionId } : {},
     ).then(normalizePendingPlans),
+  getPlan: (request: PlansGetRequest): Promise<PlansGetResult> =>
+    invoke<PlansGetResult>(IPC.invoke.plansGet, request).then((result) => ({
+      ...result,
+      proposal: normalizePlanProposal(result.proposal),
+    })),
   resolvePlan: (resolution: PlanResolveRequest) =>
     invoke<PlanResolutionResult>(IPC.invoke.plansResolve, resolution),
   listPlugins: () =>

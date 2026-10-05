@@ -11,6 +11,14 @@ describe("mode-specific system prompts", () => {
 
     expect(prompt).toContain("base instructions");
     expect(prompt).toContain(PLAN_MODE_SYSTEM_PROMPT);
+    expect(prompt).toContain("three or more concrete implementation steps");
+    expect(prompt).toContain("kebab-case ids and dependsOn");
+    expect(prompt).toContain('"Steps" section');
+    expect(prompt).toContain("only when the task creates or substantially redesigns a user interface");
+    expect(prompt).toContain("#RRGGBB color groups");
+    expect(prompt).toContain('"Design" section');
+    expect(prompt).toContain("PLAN_STEPS_INVALID or PLAN_DESIGN_INVALID");
+    expect(prompt).toContain("resubmit the complete snapshot in the same turn");
     expect(prompt).toContain("Inspect the workspace");
     expect(prompt).toContain("SubmitPlan");
     expect(prompt).toContain("When any initial or revised plan is ready");
@@ -48,6 +56,8 @@ describe("mode-specific system prompts", () => {
     // Goal mode negotiates outcomes; the Plan contract must not leak into it.
     expect(prompt).not.toContain("SubmitPlan");
     expect(prompt).not.toContain(PLAN_MODE_SYSTEM_PROMPT);
+    expect(prompt).not.toContain("PLAN_STEPS_INVALID");
+    expect(prompt).not.toContain("#RRGGBB");
   });
 
   it("keeps Agent composition separate from Plan composition", () => {

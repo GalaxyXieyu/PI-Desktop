@@ -1,4 +1,6 @@
 export * from "./activation.js";
+export * from "./plan-steps.js";
+export * from "./plan-design.js";
 export * from "./protocol.js";
 export * from "./errors.js";
 export * from "./rpc-error.js";

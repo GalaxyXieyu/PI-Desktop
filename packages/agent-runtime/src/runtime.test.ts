@@ -23,6 +23,7 @@ import {
   type RuntimeProviderConfig,
 } from "./runtime.js";
 import { estimateOutputCapInputTokens } from "./output-cap.js";
+import { approvedPlanInstruction } from "./approved-plan-instruction.js";
 
 import { COMPACTION_SUMMARY_MAX_RETRIES } from "./compaction-summary-input.js";
 import type { ProjectInstructions } from "./project-instructions.js";
@@ -2422,6 +2423,66 @@ describe("DesktopAgentRuntime tool schema completeness (#864)", () => {
 });
 
 describe("DesktopAgentRuntime plan transitions", () => {
+  it("recovers from cyclic steps and submits a corrected snapshot in the same turn", async () => {
+    const markdown = "  # Plan\n\n## Steps\n1. First\n2. Second\n  ";
+    const host = { call: vi.fn(async (method: string) => method === "plans.submit" ? {
+      status: "pending",
+      proposal: {
+        id: "proposal-1", title: "Plan", markdown, question: "Proceed?",
+        artifact: { relativePath: ".pi/plan/proposal-1.md", sha256: "hash", sizeBytes: markdown.length },
+      },
+    } : undefined) };
+    const runtime = createRuntime({ host, mode: "plan" });
+    const requests: AgentMessage[][] = [];
+    const internals = runtime as unknown as {
+      agent: Agent;
+      models: { streamSimple: (model: unknown, context: { messages: AgentMessage[] }) => ReturnType<typeof createAssistantMessageEventStream> };
+    };
+    internals.models = {
+      streamSimple: (_model, context) => {
+        requests.push([...context.messages]);
+        const cyclic = requests.length === 1;
+        const message = assistantMessage({
+          content: [{ type: "toolCall", id: `submit-${requests.length}`, name: "SubmitPlan", arguments: {
+            title: " Plan ", markdown, question: " Proceed? ",
+            steps: [
+              { id: "first", title: " First ", dependsOn: cyclic ? ["second"] : [] },
+              { id: "second", title: "Second", dependsOn: ["first"] },
+            ],
+            design: { framework: " React ", colorSystem: { primary: ["#aabbcc"] } },
+          } }], stopReason: "toolUse",
+        }) as unknown as AssistantMessage;
+        const stream = createAssistantMessageEventStream();
+        queueMicrotask(() => {
+          stream.push({ type: "start", partial: message });
+          stream.push({ type: "done", reason: "toolUse", message });
+          stream.end(message);
+        });
+        return stream;
+      },
+    };
+    try {
+      await runtime.prompt("Plan this work.", "user-1", "turn-1");
+      expect(requests).toHaveLength(2);
+      const error = requests[1].find((message) => message.role === "toolResult" && message.toolCallId === "submit-1");
+      expect(error).toMatchObject({ isError: true, details: { errorCode: "PLAN_STEPS_INVALID" } });
+      expect(error).not.toHaveProperty("terminate");
+      expect(JSON.stringify(error)).toContain("cycle:");
+      expect(JSON.stringify(error)).toContain("No approval was created.");
+      const submissions = host.call.mock.calls.filter(([method]) => method === "plans.submit");
+      expect(submissions).toHaveLength(1);
+      expect(host.call).toHaveBeenCalledWith("plans.submit", {
+        sessionId: "session-1", turnId: "turn-1", toolCallId: "submit-2", kind: "plan",
+        title: "Plan", markdown, question: "Proceed?",
+        steps: [{ id: "first", title: "First", dependsOn: [] }, { id: "second", title: "Second", dependsOn: ["first"] }],
+        design: { framework: "react", colorSystem: { primary: ["#AABBCC"] } },
+      });
+      expect(runtime.getStatus().planningState).toBe("awaiting_approval");
+    } finally {
+      await runtime.dispose();
+    }
+  });
+
   it.each(["plan", "goal"] as const)(
     "continues the %s user turn after a missing-workspace submission",
     async (kind) => {
@@ -2617,14 +2678,15 @@ describe("DesktopAgentRuntime plan transitions", () => {
     expect(agent.state.tools.map((tool: any) => tool.name)).toContain("SubmitPlan");
     expect(host.call).toHaveBeenLastCalledWith(
       "plans.submit",
-      expect.objectContaining({
+      {
         sessionId: "session-1",
+        turnId: "turn-1",
         toolCallId: "submit-call-1",
         kind: "plan",
         title: proposal.title,
         markdown: proposal.markdown,
         question: proposal.question,
-      }),
+      },
     );
     expect(host.call).toHaveBeenCalledTimes(2);
 
@@ -6769,6 +6831,7 @@ describe("DesktopAgentRuntime inline context compaction", () => {
     const preparation = {
       firstKeptEntryId: "recent-user",
       tokensBefore: 160_000,
+      messagesToSummarize: [],
       retainedTail: [],
     };
 
@@ -10268,6 +10331,146 @@ describe("compaction fallback retention (#827)", () => {
       retainedTailMode: "active_turn",
       retainedTailShape: "recent_window",
     });
+    await runtime.dispose();
+  });
+});
+
+describe("DesktopAgentRuntime approved-plan compaction continuity", () => {
+  function messageEntry(id: string, parentId: string | null, message: unknown, seq: number) {
+    return {
+      type: "message" as const,
+      id,
+      seq,
+      parentId,
+      timestamp: Date.parse("2026-09-21T18:00:00Z") + seq * 1_000,
+      message,
+    };
+  }
+
+  it("carries the approved plan contract and checklist state through compaction", async () => {
+    const host = { call: vi.fn().mockResolvedValue(undefined) };
+    const runtime = createRuntime({ host });
+    const planExecution: PlanExecution = {
+      id: "execution-1",
+      proposalId: "proposal-1",
+      sessionId: "session-1",
+      kind: "plan",
+      title: "Ship interactive plans",
+      question: "Proceed?",
+      plan: "# Plan\n\nDo the thing.\n",
+      artifact: { relativePath: ".pi/plan/proposal-1.md", sha256: "hash", sizeBytes: 36 },
+      targetPermissionMode: "ask",
+      state: "running",
+      steps: [
+        { id: "s1", title: "Wire the model", dependsOn: [] },
+        { id: "s2", title: "Route the session", dependsOn: ["s1"] },
+      ],
+    };
+    const instruction = approvedPlanInstruction(planExecution);
+    (runtime as any).fullEntries = [
+      messageEntry(
+        "user-1",
+        null,
+        { role: "user", content: [{ type: "text", text: instruction }], timestamp: 1 },
+        0,
+      ),
+      messageEntry(
+        "assistant-1",
+        "user-1",
+        {
+          ...assistantMessage({
+            content: [
+              {
+                type: "toolCall" as const,
+                id: "todo-1",
+                name: "TodoWrite",
+                arguments: {
+                  todos: [
+                    { content: "Wire the model", status: "completed", stepId: "s1" },
+                    { content: "Route the session", status: "in_progress", stepId: "s2" },
+                  ],
+                },
+              },
+            ],
+            stopReason: "toolUse",
+          }),
+          timestamp: 2,
+        },
+        1,
+      ),
+      messageEntry(
+        "todo-1",
+        "assistant-1",
+        {
+          role: "toolResult" as const,
+          toolCallId: "todo-1",
+          toolName: "TodoWrite",
+          content: [{ type: "text" as const, text: "Checklist updated." }],
+          isError: false,
+          timestamp: 3,
+        },
+        2,
+      ),
+      messageEntry(
+        "assistant-2",
+        "todo-1",
+        {
+          ...assistantMessage({ content: [{ type: "text", text: "Step one is done." }] }),
+          timestamp: 4,
+        },
+        3,
+      ),
+    ];
+    vi.spyOn(runtime as any, "generateCompaction").mockResolvedValue({
+      ok: true,
+      value: { summary: "Plan execution in progress.", tokensBefore: 80_000 },
+    });
+
+    await expect((runtime as any).runCompaction("threshold", false)).resolves.toBe(true);
+
+    const call = host.call.mock.calls.find(
+      ([method]) => method === "session.appendCompaction",
+    );
+    const checkpoint = (call?.[1] as any)?.compaction;
+    expect(checkpoint.summary).toContain("Plan execution in progress.");
+    expect(checkpoint.summary).toContain("<approved-plan-continuity>");
+    expect(checkpoint.summary).toContain("1. [s1] Wire the model");
+    expect(checkpoint.summary).toContain("- [completed] (s1) Wire the model");
+    expect(checkpoint.summary).toContain("- [in_progress] (s2) Route the session");
+    // The rebuilt model context replays the persisted block after the compaction.
+    const replayed = (runtime as any).agent.state.messages.filter(
+      (message: any) => message.role !== "system",
+    );
+    const summary = replayed.find((message: any) => message.role === "compactionSummary");
+    expect(summary).toBeDefined();
+    expect(JSON.stringify(summary)).toContain("approved-plan-continuity");
+    expect(JSON.stringify(summary)).toContain("- [completed] (s1) Wire the model");
+    await runtime.dispose();
+  });
+
+  it("leaves summaries byte-identical when no approved plan is in range", async () => {
+    const host = { call: vi.fn().mockResolvedValue(undefined) };
+    const runtime = createRuntime({ host });
+    (runtime as any).fullEntries = [
+      messageEntry(
+        "user-1",
+        null,
+        { role: "user", content: [{ type: "text", text: "continue the migration" }], timestamp: 1 },
+        0,
+      ),
+    ];
+    vi.spyOn(runtime as any, "generateCompaction").mockResolvedValue({
+      ok: true,
+      value: { summary: "Migration continues.", tokensBefore: 80_000 },
+    });
+
+    await expect((runtime as any).runCompaction("threshold", false)).resolves.toBe(true);
+
+    const call = host.call.mock.calls.find(
+      ([method]) => method === "session.appendCompaction",
+    );
+    const checkpoint = (call?.[1] as any)?.compaction;
+    expect(checkpoint.summary).toBe("Migration continues.");
     await runtime.dispose();
   });
 });

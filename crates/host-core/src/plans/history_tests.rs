@@ -29,6 +29,8 @@ fn plan_history_returns_authoritative_approved_snapshot_without_rewriting_transc
                 version: Some(proposal.version),
                 action: "approve",
                 target_permission_mode: Some("ask"),
+                revised_steps: None,
+                revised_design: None,
             },
         )
         .unwrap();
@@ -62,6 +64,85 @@ fn plan_history_returns_authoritative_approved_snapshot_without_rewriting_transc
 }
 
 #[test]
+fn plan_history_preserves_submitted_metadata_and_approval_revisions() {
+    let steps = json!([{"id":"first","title":"Submitted step"}]);
+    let design = json!({"framework":"react"});
+    let revisions = [
+        (None, None),
+        (
+            Some(json!([{"id":"revised","title":"Approved step"}])),
+            Some(json!({"framework":"vue"})),
+        ),
+        (Some(json!([])), Some(json!({}))),
+    ];
+    for (revised_steps, revised_design) in revisions {
+        let (dir, db) = test_db();
+        let root = dir.path().join("workspace");
+        fs::create_dir_all(&root).unwrap();
+        let session = plan_session(&db, &root);
+        let turn = live_turn(&db, &session.id);
+        let proposal = PlanManager
+            .submit(
+                &db,
+                PlanSubmitParams {
+                    workspace_root: &root,
+                    session_id: &session.id,
+                    turn_id: &turn,
+                    tool_call_id: "metadata-history",
+                    kind: KIND_PLAN,
+                    title: "Structured plan",
+                    markdown: "# Immutable plan",
+                    question: "Proceed?",
+                    steps: Some(&steps),
+                    design: Some(&design),
+                },
+            )
+            .unwrap();
+        let message = serde_json::from_value(json!({
+            "id": "metadata-tool", "role": "tool", "content": "Plan submitted",
+            "createdAt": proposal.created_at, "toolName": "SubmitPlan",
+            "toolCallId": proposal.tool_call_id,
+            "toolResult": { "details": { "proposal": proposal } }
+        }))
+        .unwrap();
+        sessions::append_message(&db, &session.id, &message, Some(&turn)).unwrap();
+        sessions::end_turn(&db, &turn, "completed", None, None, false).unwrap();
+        let resolution = PlanManager
+            .resolve(
+                &db,
+                PlanResolveParams {
+                    workspace_root: Some(&root),
+                    proposal_id: &proposal.id,
+                    session_id: &session.id,
+                    turn_id: &turn,
+                    tool_call_id: &proposal.tool_call_id,
+                    version: Some(proposal.version),
+                    action: "approve",
+                    target_permission_mode: Some("ask"),
+                    revised_steps: revised_steps.as_ref(),
+                    revised_design: revised_design.as_ref(),
+                },
+            )
+            .unwrap();
+        let detail = sessions::get_session_with_options(
+            &db,
+            &session.id,
+            sessions::SessionReadOptions {
+                content_limit: Some(16),
+                ..Default::default()
+            },
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(detail.plan_history.len(), 1);
+        assert!(!detail.plan_history[0].superseded);
+        assert_eq!(detail.plan_history[0].proposal, resolution.proposal);
+        assert_eq!(detail.plan_history[0].proposal.steps, proposal.steps);
+        assert_eq!(detail.plan_history[0].proposal.design, proposal.design);
+    }
+}
+
+#[test]
 fn plan_history_is_page_scoped_survives_reopen_and_retains_superseded_versions() {
     let (dir, db) = test_db();
     let root = dir.path().join("workspace");
@@ -89,6 +170,8 @@ fn plan_history_is_page_scoped_survives_reopen_and_retains_superseded_versions()
                 version: Some(first.version),
                 action: "reject",
                 target_permission_mode: None,
+                revised_steps: None,
+                revised_design: None,
             },
         )
         .unwrap();
@@ -106,6 +189,8 @@ fn plan_history_is_page_scoped_survives_reopen_and_retains_superseded_versions()
                 title: "Revised API",
                 markdown: "# Revised\n- preserve this version",
                 question: "Proceed?",
+                steps: None,
+                design: None,
             },
         )
         .unwrap();

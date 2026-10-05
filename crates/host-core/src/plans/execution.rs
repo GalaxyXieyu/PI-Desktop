@@ -20,6 +20,18 @@ pub(crate) fn execution_from_proposal(proposal: &PlanProposal) -> Result<Option<
         artifact,
         target_permission_mode,
         state,
+        steps: proposal
+            .resolved_steps
+            .as_ref()
+            .or(proposal.steps.as_ref())
+            .filter(|steps| !steps.is_empty())
+            .cloned(),
+        design: proposal
+            .resolved_design
+            .as_ref()
+            .or(proposal.design.as_ref())
+            .filter(|design| !design.is_empty())
+            .cloned(),
     }))
 }
 
@@ -31,6 +43,7 @@ pub(crate) fn resolution_from_proposal(proposal: PlanProposal) -> Result<PlanRes
         target_permission_mode: proposal.target_permission_mode.clone(),
         execution,
         proposal,
+        seeded_todos: false,
     })
 }
 

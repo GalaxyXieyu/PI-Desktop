@@ -3,11 +3,13 @@ import { createAssistantMessageEventStream, type AssistantMessage, type Context,
 import { DesktopAgentRuntime } from "./runtime.js";
 
 describe("TodoWrite Agent user path", () => {
-  it("passes overlong Unicode content to the authoritative host and returns its truncation warning", async () => {
+  it.each([undefined, "approved-step"])("passes overlong Unicode content and stepId=%s through the host and result snapshot", async (stepId) => {
     const content = "😀".repeat(501);
+    const item = { content, status: "in_progress", ...(stepId ? { stepId } : {}) };
+    const snapshot = { revision: 1, todos: [{ ...item, content: "😀".repeat(500) }] };
     const requests: Context[] = [];
     const hostCall = vi.fn(async (method: string) => method === "tools.execute"
-      ? { ok: true, content: { content: [{ type: "text", text: "Checklist updated: 0/1 completed [1 item(s) were truncated to 500 characters]" }], details: { revision: 1 } } }
+      ? { ok: true, content: { content: [{ type: "text", text: "Checklist updated: 0/1 completed [1 item(s) were truncated to 500 characters]" }], details: snapshot } }
       : undefined);
     const runtime = new DesktopAgentRuntime({
       host: { call: hostCall as never },
@@ -25,7 +27,7 @@ describe("TodoWrite Agent user path", () => {
       const toolCall: ToolCall | undefined = round === 1
         ? { type: "toolCall" as const, id: "discover-todos", name: "ToolSearch", arguments: { query: "TodoWrite" } }
         : round === 2
-          ? { type: "toolCall" as const, id: "write-todos", name: "TodoWrite", arguments: { todos: [{ content, status: "in_progress" }] } }
+          ? { type: "toolCall" as const, id: "write-todos", name: "TodoWrite", arguments: { todos: [item] } }
           : undefined;
       const message: AssistantMessage = {
         role: "assistant", api: "openai-completions", provider: "local", model: "local-model",
@@ -48,9 +50,10 @@ describe("TodoWrite Agent user path", () => {
       await runtime.prompt("Track the implementation steps.", "user-todo", "turn-todo");
       const result = requests.at(-1)?.messages.find((message) => message.role === "toolResult" && message.toolCallId === "write-todos");
       expect(result).toMatchObject({ isError: false, content: [{ type: "text", text: expect.stringContaining("truncated to 500 characters") }] });
+      expect(result).toMatchObject({ details: { details: snapshot } });
       expect(hostCall).toHaveBeenCalledWith("tools.execute", expect.objectContaining({
         sessionId: "todo-session", turnId: "turn-todo", toolName: "TodoWrite",
-        args: { todos: [{ content, status: "in_progress" }] },
+        args: { todos: [item] },
       }));
     } finally {
       await runtime.dispose();

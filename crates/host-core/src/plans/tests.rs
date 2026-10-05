@@ -38,6 +38,8 @@ fn submit(manager: &PlanManager, db: &Database, root: &Path, call: &str) -> Plan
                 title: "Build API",
                 markdown: "# Plan\n- implement",
                 question: "Proceed?",
+                steps: None,
+                design: None,
             },
         )
         .unwrap()
@@ -139,6 +141,8 @@ fn publication_collides_without_overwriting() {
                 title: "Build API",
                 markdown: "second",
                 question: "Proceed?",
+                steps: None,
+                design: None,
             },
         )
         .unwrap();
@@ -171,6 +175,8 @@ fn oversized_markdown_is_rejected_before_artifact_creation() {
                 title: "Too large",
                 markdown: &"x".repeat(PLAN_MAX_MARKDOWN_BYTES + 1),
                 question: "Proceed?",
+                steps: None,
+                design: None,
             },
         )
         .unwrap_err();
@@ -202,6 +208,8 @@ fn existing_plan_symlink_is_rejected() {
                 title: "Plan",
                 markdown: "body",
                 question: "?",
+                steps: None,
+                design: None,
             },
         )
         .unwrap_err();
@@ -232,6 +240,8 @@ fn pending_rows_are_interrupted_during_database_restart() {
                     title: "Plan",
                     markdown: "body",
                     question: "?",
+                    steps: None,
+                    design: None,
                 },
             )
             .unwrap()
@@ -275,6 +285,8 @@ fn reject_has_no_side_effects_and_allows_new_turn_submission() {
                 version: Some(proposal.version),
                 action: "reject",
                 target_permission_mode: None,
+                revised_steps: None,
+                revised_design: None,
             },
         )
         .unwrap();
@@ -305,6 +317,8 @@ fn reject_has_no_side_effects_and_allows_new_turn_submission() {
                 title: "Build API revised",
                 markdown: "# Plan\n- revise",
                 question: "Proceed with the revision?",
+                steps: None,
+                design: None,
             },
         )
         .unwrap();
@@ -364,6 +378,8 @@ fn approval_switches_session_and_creates_outbox_atomically() {
                 version: Some(proposal.version),
                 action: "approve",
                 target_permission_mode: Some("accept-edits"),
+                revised_steps: None,
+                revised_design: None,
             },
         )
         .unwrap();
@@ -399,6 +415,8 @@ fn duplicate_resolution_returns_committed_result_and_conflict_is_stale() {
                 version: Some(proposal.version),
                 action: "approve",
                 target_permission_mode: Some("auto"),
+                revised_steps: None,
+                revised_design: None,
             },
         )
         .unwrap();
@@ -414,6 +432,8 @@ fn duplicate_resolution_returns_committed_result_and_conflict_is_stale() {
                 version: Some(proposal.version),
                 action: "approve",
                 target_permission_mode: Some("auto"),
+                revised_steps: None,
+                revised_design: None,
             },
         )
         .unwrap();
@@ -432,6 +452,8 @@ fn duplicate_resolution_returns_committed_result_and_conflict_is_stale() {
                     version: Some(proposal.version),
                     action: "reject",
                     target_permission_mode: None,
+                    revised_steps: None,
+                    revised_design: None,
                 },
             )
             .unwrap_err()
@@ -506,6 +528,8 @@ fn approval_deadline_expires_lazily_and_rejects_late_resolution() {
                     version: Some(proposal.version),
                     action: "reject",
                     target_permission_mode: None,
+                    revised_steps: None,
+                    revised_design: None,
                 },
             )
             .unwrap_err()
@@ -533,6 +557,8 @@ fn claim_and_finish_are_durable_cas_transitions() {
                 version: Some(proposal.version),
                 action: "approve",
                 target_permission_mode: Some("auto"),
+                revised_steps: None,
+                revised_design: None,
             },
         )
         .unwrap();
@@ -616,6 +642,8 @@ fn configure_gate_blocks_pending_and_active_execution_changes() {
                 version: Some(proposal.version),
                 action: "approve",
                 target_permission_mode: Some("auto"),
+                revised_steps: None,
+                revised_design: None,
             },
         )
         .unwrap();
@@ -731,6 +759,8 @@ fn goal_contract_round_trips_through_its_own_kind() {
                 title: "Ship checkout",
                 markdown: "# Goal\n## Acceptance criteria\n- tests pass",
                 question: "Approve this goal?",
+                steps: None,
+                design: None,
             },
         )
         .unwrap();
@@ -762,6 +792,8 @@ fn goal_contract_round_trips_through_its_own_kind() {
                 version: Some(proposal.version),
                 action: "approve",
                 target_permission_mode: Some("accept-edits"),
+                revised_steps: None,
+                revised_design: None,
             },
         )
         .unwrap();
@@ -802,6 +834,8 @@ fn submitting_the_other_contract_kind_is_rejected() {
                     title: "Plan in a goal session",
                     markdown: "# Plan",
                     question: "Proceed?",
+                    steps: None,
+                    design: None,
                 },
             )
             .unwrap_err()
@@ -824,6 +858,8 @@ fn submitting_the_other_contract_kind_is_rejected() {
                     title: "Goal in a plan session",
                     markdown: "# Goal",
                     question: "Approve?",
+                    steps: None,
+                    design: None,
                 },
             )
             .unwrap_err()

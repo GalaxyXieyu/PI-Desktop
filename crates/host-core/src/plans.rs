@@ -19,10 +19,14 @@ pub(crate) use crate::sessions;
 mod approval;
 mod artifact;
 mod execution;
+mod metadata;
 mod model;
 mod repository;
+mod revision;
 
 pub use approval::{expire_pending_approvals, gate_session_configure};
+pub(crate) use metadata::valid_step_id;
+pub use metadata::{PlanDesign, PlanStep};
 pub use model::{
     kind_for_mode, normalize_kind, PlanArtifact, PlanExecution, PlanHistoryEntry, PlanManager,
     PlanProposal, PlanResolution, PlanResolveParams, PlanSubmitParams, EXECUTION_COMPLETED,
@@ -41,5 +45,7 @@ pub(crate) use repository::{
     session_submit_kind, PROPOSAL_COLUMNS,
 };
 
+#[cfg(test)]
+mod revision_tests;
 #[cfg(test)]
 mod tests;

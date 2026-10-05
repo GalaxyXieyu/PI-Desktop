@@ -10,6 +10,7 @@ use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension, Transaction};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashSet;
 
 use crate::db::{now_ms, Database};
 
@@ -50,6 +51,8 @@ pub struct TodoItem {
     pub content: String,
     pub status: String,
     pub priority: String,
+    #[serde(default, rename = "stepId", skip_serializing_if = "Option::is_none")]
+    pub step_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -137,8 +140,14 @@ pub fn normalize_input(value: &Value) -> Result<NormalizedTodos> {
 
     let mut truncated = 0usize;
     let mut items = Vec::with_capacity(todos.len());
+    let mut step_ids = HashSet::new();
     for (index, item) in todos.iter().enumerate() {
         let (item, was_truncated) = normalize_item(item, index)?;
+        if let Some(id) = &item.step_id {
+            if !step_ids.insert(id.clone()) {
+                return Err(anyhow!("todos[{index}].stepId must be unique"));
+            }
+        }
         if was_truncated {
             truncated += 1;
         }
@@ -223,11 +232,19 @@ fn normalize_item(value: &Value, index: usize) -> Result<(TodoItem, bool)> {
         }
     };
 
+    let step_id = object.get("stepId").map(|value| {
+        let id = value.as_str().ok_or_else(|| anyhow!("todos[{index}].stepId must be a string"))?.trim();
+        if !crate::plans::valid_step_id(id) {
+            return Err(anyhow!("todos[{index}].stepId must match [A-Za-z0-9][A-Za-z0-9._-]* and contain 1..=64 characters"));
+        }
+        Ok(id.to_owned())
+    }).transpose()?;
     Ok((
         TodoItem {
             content,
             status: status.to_string(),
             priority: priority.to_string(),
+            step_id,
         },
         truncated,
     ))
@@ -259,7 +276,7 @@ fn read_tx(tx: &Transaction<'_>, session_id: &str) -> Result<Option<TodoSnapshot
         return Ok(None);
     };
     let mut stmt = tx.prepare(
-        "SELECT content, status, priority FROM session_todo
+        "SELECT content, status, priority, step_id FROM session_todo
           WHERE session_id = ?1 ORDER BY position ASC",
     )?;
     let todos = stmt
@@ -268,6 +285,7 @@ fn read_tx(tx: &Transaction<'_>, session_id: &str) -> Result<Option<TodoSnapshot
                 content: row.get(0)?,
                 status: row.get(1)?,
                 priority: row.get(2)?,
+                step_id: row.get(3)?,
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -339,6 +357,60 @@ fn replace_tx(
         return Err(TodoWriteError::Refused(TodoRefusal::TurnNotRunning));
     }
 
+    let previous = read_tx(tx, session_id).map_err(TodoWriteError::Internal)?;
+    let mut items = normalized.items.clone();
+    if let Some(previous) = previous {
+        carry_step_ids(&previous.todos, &mut items);
+    }
+    write_rows_tx(tx, session_id, items).map_err(TodoWriteError::Internal)
+}
+
+/// Preserve identity only for an exact, unambiguous old content match. Explicit
+/// new claims take precedence regardless of their position in the list.
+fn carry_step_ids(previous: &[TodoItem], items: &mut [TodoItem]) {
+    let mut claimed: HashSet<String> = items
+        .iter()
+        .filter_map(|item| item.step_id.clone())
+        .collect();
+    for item in items.iter_mut().filter(|item| item.step_id.is_none()) {
+        let mut matches = previous.iter().filter(|old| old.content == item.content);
+        if let Some(old) = matches.next() {
+            if matches.next().is_none() {
+                if let Some(id) = &old.step_id {
+                    if claimed.insert(id.clone()) {
+                        item.step_id = Some(id.clone());
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Approval owns authorization and the transaction; unlike TodoWrite it runs
+/// between turns. The caller supplies normalized, non-empty effective steps.
+pub(crate) fn seed_from_plan_tx(
+    tx: &Transaction<'_>,
+    session_id: &str,
+    steps: &[crate::plans::PlanStep],
+) -> Result<()> {
+    let items = steps
+        .iter()
+        .map(|step| TodoItem {
+            content: step.title.clone(),
+            status: STATUS_PENDING.to_owned(),
+            priority: PRIORITY_MEDIUM.to_owned(),
+            step_id: Some(step.id.clone()),
+        })
+        .collect();
+    write_rows_tx(tx, session_id, items)?;
+    Ok(())
+}
+
+fn write_rows_tx(
+    tx: &Transaction<'_>,
+    session_id: &str,
+    items: Vec<TodoItem>,
+) -> Result<TodoSnapshot> {
     let now = now_ms();
     let revision: i64 = tx.query_row(
         "UPDATE sessions SET todo_revision = todo_revision + 1, todo_updated_at = ?2
@@ -350,28 +422,33 @@ fn replace_tx(
         "DELETE FROM session_todo WHERE session_id = ?1",
         params![session_id],
     )?;
-    for (position, item) in normalized.items.iter().enumerate() {
+    for (position, item) in items.iter().enumerate() {
         tx.execute(
             "INSERT INTO session_todo
-               (session_id, position, content, status, priority, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+               (session_id, position, content, status, priority, updated_at, step_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 session_id,
                 position as i64,
                 item.content,
                 item.status,
                 item.priority,
-                now
+                now,
+                item.step_id,
             ],
         )?;
     }
     Ok(TodoSnapshot {
         session_id: session_id.to_string(),
-        todos: normalized.items.clone(),
+        todos: items,
         revision,
         updated_at: now,
     })
 }
+
+#[cfg(test)]
+#[path = "todos/step_id_tests.rs"]
+mod step_id_tests;
 
 #[cfg(test)]
 mod tests {

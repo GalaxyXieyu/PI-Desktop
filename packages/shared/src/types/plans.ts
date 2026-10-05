@@ -1,4 +1,6 @@
 /** Shared public types grouped by the owning application domain. */
+import { isPlanDesignEmpty, type PlanDesignSpec } from "../plan-design.js";
+import type { PlanStep } from "../plan-steps.js";
 import type { Mode } from "./common.js";
 import type { GlobalPermissionMode } from "./permissions.js";
 
@@ -70,6 +72,14 @@ export type PlanProposal = {
   markdown: string;
   question: string;
   artifact?: PlanArtifact;
+  /** Submitted steps; omitted means none. */
+  steps?: PlanStep[];
+  /** Submitted design; omitted means none. */
+  design?: PlanDesignSpec;
+  /** User revision at approval; omitted means no revision, [] explicitly clears. */
+  resolvedSteps?: PlanStep[];
+  /** User revision at approval; omitted means no revision, {} explicitly clears. */
+  resolvedDesign?: PlanDesignSpec;
   /** Host schema/version for this proposal snapshot. */
   version: number;
   status: PlanProposalStatus;
@@ -98,6 +108,10 @@ export type PlanExecution = {
   title: string;
   question: string;
   artifact: PlanArtifact;
+  /** Effective approved steps; omitted means none. */
+  steps?: PlanStep[];
+  /** Effective approved design; omitted means none. */
+  design?: PlanDesignSpec;
   targetPermissionMode: GlobalPermissionMode;
   state: PlanExecutionState;
 };
@@ -124,6 +138,18 @@ export type PlanningStateEvent = {
   proposal?: PlanProposal;
 };
 
+export type PlansGetRequest = { sessionId: string; proposalId: string };
+export type PlansGetResult = { proposal: PlanProposal };
+
+export function effectivePlanSteps(p: Pick<PlanProposal, "steps" | "resolvedSteps">): PlanStep[] {
+  return p.resolvedSteps ?? p.steps ?? [];
+}
+
+export function effectivePlanDesign(p: Pick<PlanProposal, "design" | "resolvedDesign">): PlanDesignSpec | undefined {
+  const design = p.resolvedDesign ?? p.design;
+  return design && !isPlanDesignEmpty(design) ? design : undefined;
+}
+
 export type PlansPendingResult = {
   plans: PlanProposal[];
   state?: PlanningState;
@@ -148,10 +174,14 @@ export type PlanResolveRequest =
   | (PlanResolveIdentity & {
       action: "approve";
       targetPermissionMode: GlobalPermissionMode;
+      revisedSteps?: PlanStep[];
+      revisedDesign?: PlanDesignSpec;
     })
   | (PlanResolveIdentity & {
       action: "reject";
       targetPermissionMode?: never;
+      revisedSteps?: never;
+      revisedDesign?: never;
     });
 
 export type PlanResolutionResult = {

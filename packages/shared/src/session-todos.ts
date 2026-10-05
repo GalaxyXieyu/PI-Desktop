@@ -12,6 +12,7 @@ export type SessionTodo = {
   content: string;
   status: TodoStatus;
   priority: TodoPriority;
+  stepId?: string;
 };
 
 export type SessionTodoSnapshot = {

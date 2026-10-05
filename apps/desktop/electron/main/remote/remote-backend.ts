@@ -81,6 +81,7 @@ const HANDLED_CHANNELS: ReadonlySet<string> = new Set([
   IPC.invoke.askToolResolve,
   IPC.invoke.plansResolve,
   IPC.invoke.plansPending,
+  IPC.invoke.plansGet,
 ]);
 
 export function createRemoteBackend(options: RemoteBackendOptions): RemoteBackend {
@@ -320,6 +321,11 @@ export function createRemoteBackend(options: RemoteBackendOptions): RemoteBacken
       }
       case IPC.invoke.plansResolve: {
         const resolution = args[0] as PlanResolveRequest;
+        if (resolution.revisedSteps !== undefined || resolution.revisedDesign !== undefined) {
+          throw Object.assign(new Error("Structured plan revisions are not supported for remote sessions"), {
+            errorCode: ErrorCodes.PLAN_REVISION_UNSUPPORTED,
+          });
+        }
         const result = await client.request<RacpApprovalResult>("approval/respond", {
           approvalId: resolution.proposalId,
           // Contract decisions ("approve"/"reject") equal the plan actions.
@@ -360,6 +366,10 @@ export function createRemoteBackend(options: RemoteBackendOptions): RemoteBacken
             : {}),
         } satisfies PlanResolutionResult;
       }
+      case IPC.invoke.plansGet:
+        throw Object.assign(new Error("Plan lookup is not supported for remote sessions"), {
+          errorCode: ErrorCodes.UNSUPPORTED,
+        });
       case IPC.invoke.plansPending:
         // Pending plan cards are restored from the attach snapshot's approvals by
         // the event bridge, so this on-demand fetch stays empty for remote hosts.

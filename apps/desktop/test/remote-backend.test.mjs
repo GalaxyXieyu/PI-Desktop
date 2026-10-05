@@ -8,7 +8,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers/ts-import-hooks.mjs")));
 
 const { IPC } = await import("@pi-desktop/shared");
-const { makeRemoteApprovalRequestId, makeRemoteSessionId } = await import(
+const { createBackendRouter, makeRemoteApprovalRequestId, makeRemoteSessionId } = await import(
   "../electron/main/remote/backend-router.ts"
 );
 const { racpSessionToSummary, snapshotToSessionDetail } = await import(
@@ -99,6 +99,26 @@ function makeBackend(responses = {}, extra = {}) {
   return { backend, client };
 }
 
+test("structured revisions and plan reads never send remote requests or fall through locally", async () => {
+  const { backend, client } = makeBackend();
+  const router = createBackendRouter();
+  router.registerBackend(REMOTE_SESSION_ID, backend);
+  for (const action of ["approve", "reject"]) {
+    for (const revision of [{ revisedSteps: [] }, { revisedDesign: {} }, { revisedSteps: null }, { revisedDesign: null }]) {
+      await assert.rejects(router.route(IPC.invoke.plansResolve, [{
+        sessionId: REMOTE_SESSION_ID, proposalId: "p", action, ...revision,
+      }]), {
+        errorCode: "PLAN_REVISION_UNSUPPORTED",
+        message: "Structured plan revisions are not supported for remote sessions",
+      });
+    }
+  }
+  await assert.rejects(router.route(IPC.invoke.plansGet, [{ sessionId: REMOTE_SESSION_ID, proposalId: "p" }]), {
+    errorCode: "UNSUPPORTED",
+  });
+  assert.deepEqual(client.calls, []);
+});
+
 test("racpSessionToSummary maps the host-agnostic renderer summary", () => {
   const session = makeRacpSession({ mode: "agent", permissionMode: "allow" });
   const summary = racpSessionToSummary(REMOTE_SESSION_ID, session, 7);
@@ -147,6 +167,7 @@ test("handles() covers exactly the channels the remote profile serves", () => {
     IPC.invoke.askToolResolve,
     IPC.invoke.plansResolve,
     IPC.invoke.plansPending,
+    IPC.invoke.plansGet,
   ];
   for (const channel of covered) assert.ok(backend.handles(channel), `${channel} should be handled`);
   // Unrelated desktop channels remain local.

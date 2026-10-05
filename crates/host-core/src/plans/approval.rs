@@ -194,6 +194,8 @@ impl PlanManager {
             title,
             markdown,
             question,
+            steps,
+            design,
         } = params;
         if session_id.trim().is_empty()
             || turn_id.trim().is_empty()
@@ -233,6 +235,22 @@ impl PlanManager {
             return Err(plan_error("PLAN_ALREADY_PENDING"));
         }
 
+        let steps = steps.filter(|value| !value.is_null());
+        let design = design.filter(|value| !value.is_null());
+        if kind == KIND_GOAL && (steps.is_some() || design.is_some()) {
+            return Err(plan_error("PLAN_METADATA_UNSUPPORTED"));
+        }
+        let steps = steps
+            .map(metadata::normalize_steps)
+            .transpose()?
+            .filter(|steps| !steps.is_empty());
+        let design = design
+            .map(metadata::normalize_design)
+            .transpose()?
+            .filter(|design| !design.is_empty());
+        let steps_json = steps.as_ref().map(serde_json::to_string).transpose()?;
+        let design_json = design.as_ref().map(serde_json::to_string).transpose()?;
+
         let (artifact, path) = publish_artifact(workspace_root, kind, title, markdown)?;
         let id = Uuid::new_v4().to_string();
         let now = now_ms();
@@ -243,9 +261,9 @@ impl PlanManager {
                  request_id, session_id, turn_id, tool_call_id, kind, plan_json,
                  title, question, status, created_at, updated_at, expires_at,
                  artifact_relative_path, artifact_sha256, artifact_size_bytes,
-                 version
+                 version, steps_json, design_json
              ) VALUES (?1, ?2, ?3, ?4, ?13, ?5, ?6, ?7, 'pending', ?8, ?8,
-                       ?9, ?10, ?11, ?12, 1)",
+                       ?9, ?10, ?11, ?12, 1, ?14, ?15)",
             )?
             .execute(params![
                 id,
@@ -261,6 +279,8 @@ impl PlanManager {
                 artifact.sha256,
                 artifact.size_bytes as i64,
                 kind,
+                steps_json,
+                design_json,
             ])?;
             artifacts::record_tx(
                 &tx,
@@ -282,6 +302,8 @@ impl PlanManager {
                     "title": title.trim(),
                     "question": question.trim(),
                     "artifact": artifact,
+                    "stepCount": steps.as_ref().map_or(0, Vec::len),
+                    "hasDesign": design.is_some(),
                 }),
             )?;
             tx.commit()?;
@@ -358,6 +380,8 @@ impl PlanManager {
             version,
             action,
             target_permission_mode,
+            revised_steps,
+            revised_design,
         } = params;
         expire_pending_approvals(db)?;
         let Some(current) = get_proposal(db, proposal_id)? else {
@@ -375,6 +399,7 @@ impl PlanManager {
         if !matches!(action, "approve" | "reject") {
             return Err(plan_error("PLAN_INVALID_ACTION"));
         }
+        let revision = revision::Revision::normalize(action, kind, revised_steps, revised_design)?;
         if current.status == STATUS_EXPIRED {
             return Err(plan_error("PLAN_APPROVAL_TIMEOUT"));
         }
@@ -391,7 +416,8 @@ impl PlanManager {
         };
         if current.status != STATUS_PENDING {
             let same_resolution = current.action.as_deref() == Some(action)
-                && (action != "approve" || current.target_permission_mode.as_deref() == selected);
+                && (action != "approve" || current.target_permission_mode.as_deref() == selected)
+                && revision.matches(&current);
             if same_resolution {
                 return resolution_from_proposal(current);
             }
@@ -446,7 +472,8 @@ impl PlanManager {
               SET status = ?1, action = ?2, target_permission_mode = ?3,
                   resolved_at = ?4, updated_at = ?4,
                   error_code = NULL, version = version + 1,
-                  execution_id = ?5, execution_state = ?6
+                  execution_id = ?5, execution_state = ?6,
+                  resolved_steps_json = ?13, resolved_design_json = ?14
               WHERE request_id = ?7 AND session_id = ?8 AND turn_id = ?9
                 AND tool_call_id = ?10 AND status = 'pending' AND version = ?11
                  AND expires_at > ?12",
@@ -464,10 +491,13 @@ impl PlanManager {
                 tool_call_id,
                 current.version,
                 now,
+                revision.steps_json,
+                revision.design_json,
             ])?;
         if changed != 1 {
             return Err(plan_error("PLAN_APPROVAL_STALE"));
         }
+        let seeded_todos = revision.seed_todos(&tx, &current, action)?;
         audit::append_tx(
             &tx,
             "plan_approval_resolved",
@@ -483,12 +513,17 @@ impl PlanManager {
                 "targetPermissionMode": selected,
                 "executionId": execution_id,
                 "executionState": (action == "approve").then_some(EXECUTION_QUEUED),
+                "revisedSteps": revision.steps_json.is_some(),
+                "revisedDesign": revision.design_json.is_some(),
+                "seededTodos": seeded_todos,
             }),
         )?;
         tx.commit()?;
         let proposal =
             get_proposal(db, proposal_id)?.ok_or_else(|| plan_error("PLAN_NOT_FOUND"))?;
-        resolution_from_proposal(proposal)
+        let mut resolution = resolution_from_proposal(proposal)?;
+        resolution.seeded_todos = seeded_todos > 0;
+        Ok(resolution)
     }
 
     pub fn abort_session(&self, db: &Database, session_id: &str) -> Result<bool> {

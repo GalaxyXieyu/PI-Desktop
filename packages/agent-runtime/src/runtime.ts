@@ -1,7 +1,9 @@
 import { resolveMcpToolSelection } from "./mcp-tool-selection.js";
 import { TOOL_ACTIVATION_SECTION, toolDeclarationPolicy, toolActivationSection, restoredToolActivation, syncToolActivation, type ToolDeclarationPolicy } from "./fixed-tool-declarations.js";
 import { orderSystemRows, SystemTranscriptJournal } from "./system-transcript-journal.js";
-import { planWorkspaceRequiredResult } from "./plan-workspace-error.js";
+import { parseSubmitArguments, submitFailureResult, submitToolParameters } from "./plan-submission.js";
+import { approvedPlanInstruction } from "./approved-plan-instruction.js";
+import { planContinuityNote } from "./plan-continuity.js";
 import { accountModelStream } from "./request-usage.js";
 import { modeToolDenial, retainModeToolDeclaration, withModeExecutionGuard } from "./mode-tool-access.js";
 import { restoreHostedSearchReplay } from "./hosted-search-replay.js";
@@ -5587,52 +5589,12 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         kind === "plan"
           ? "Submit one new complete Markdown implementation plan for user approval. Prior submissions are immutable historical checkpoints; after a rejected, expired, or interrupted approval, revise the plan and submit a new full snapshot in this turn. Do not use this until the plan is concrete."
           : "Submit one new complete Markdown goal contract for user approval: the outcome to reach, the acceptance criteria that prove it, and the boundaries you must not cross. Prior submissions are immutable historical checkpoints; after a rejected, expired, or interrupted approval, revise the contract and submit a new full snapshot in this turn. Do not use this until the goal is unambiguous and every criterion is checkable.",
-      parameters: Type.Object({
-        title: Type.String({
-          description:
-            kind === "plan"
-              ? "A concise title for the implementation plan."
-              : "A concise title naming the goal.",
-        }),
-        markdown: Type.String({
-          description:
-            kind === "plan"
-              ? "The exact Markdown implementation plan, including files, behavior, and validation."
-              : "The exact Markdown goal contract, with a Goal section, an Acceptance criteria section of objectively checkable items, and a Boundaries section. Describe outcomes, not implementation steps.",
-        }),
-        question: Type.String({
-          description:
-            kind === "plan"
-              ? "The question or decision the user should answer when approving this plan."
-              : "The question or decision the user should answer when approving this goal contract.",
-        }),
-      }),
+      parameters: submitToolParameters(kind),
       executionMode: "sequential",
       execute: async (toolCallId, params) => {
-        const title =
-          isRecord(params) && typeof params.title === "string"
-            ? params.title.trim()
-            : "";
-        const markdown =
-          isRecord(params) && typeof params.markdown === "string"
-            ? params.markdown
-            : "";
-        const question =
-          isRecord(params) && typeof params.question === "string"
-            ? params.question.trim()
-            : "";
-        if (!title || !markdown.trim() || !question) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `${name} requires non-empty title, markdown, and question.`,
-              },
-            ],
-            details: { errorCode: "PLAN_INVALID_ARGUMENT" },
-            isError: true,
-          };
-        }
+        const parsed = parseSubmitArguments(kind, params);
+        if (!parsed.ok) return parsed.result;
+        const { title, markdown, question, steps, design } = parsed;
         let result: { status?: string; proposal?: PlanProposal };
         try {
           result = await this.host.call("plans.submit", {
@@ -5645,24 +5607,11 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             title,
             markdown,
             question,
+            ...(steps ? { steps } : {}),
+            ...(design ? { design } : {}),
           });
         } catch (error) {
-          const recovery = planWorkspaceRequiredResult(error);
-          if (recovery) return recovery;
-          const errorCode =
-            (error as { data?: { errorCode?: string } })?.data?.errorCode ??
-            "PLAN_SUBMIT_FAILED";
-          return {
-            content: [
-              {
-                type: "text",
-                text: `${modeLabel(kind)} submission failed: ${errorCode}`,
-              },
-            ],
-            details: { errorCode },
-            isError: true,
-            terminate: true,
-          };
+          return submitFailureResult(kind, error);
         }
 
         const proposal = result.proposal;
@@ -6842,9 +6791,16 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     usage?: Usage,
     details?: unknown,
   ): ContextCompactionRecord {
+    // An approved-plan execution keeps its contract across compaction: the
+    // note rides on the persisted summary, so it survives restarts without
+    // any new checkpoint fields. Every other conversation is byte-identical.
+    const continuity = planContinuityNote(
+      preparation.messagesToSummarize,
+      preparation.retainedTail,
+    );
     return {
       id: randomUUID(),
-      summary,
+      summary: continuity ? `${summary}\n\n${continuity}` : summary,
       firstKeptMessageId: preparation.firstKeptEntryId,
       throughMessageId,
       tokensBefore: preparation.tokensBefore,
@@ -8376,32 +8332,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     this.autonomousExecution = true;
 
     const kind = execution.kind === "goal" ? "goal" : "plan";
-    const instruction =
-      kind === "goal"
-        ? [
-            "The user approved the goal contract below. Reach that goal now, autonomously.",
-            `Use the host-created goal artifact at the workspace-relative path: ${execution.artifact.relativePath}`,
-            `Approved goal title: ${execution.title}`,
-            `Approval question: ${execution.question}`,
-            "Treat the following Markdown as the exact approved contract. Do not renegotiate it, replace it with a new contract, or ask for approval again.",
-            "<approved-goal-markdown>",
-            execution.plan,
-            "</approved-goal-markdown>",
-            "Choose your own approach with the normal Agent tools. Then verify every acceptance criterion yourself, running the checks the contract names rather than assuming they pass.",
-            "Keep working while a criterion is still unmet and you have an untried approach. Stop early only if a boundary in the contract blocks you or a criterion cannot be verified; say which one and why.",
-            "Finish with a report that walks the acceptance criteria one by one, each marked met or unmet with the evidence you observed.",
-          ].join("\n")
-        : [
-            "Execute the approved implementation plan now.",
-            `Use the host-created plan artifact at the workspace-relative path: ${execution.artifact.relativePath}`,
-            `Approved plan title: ${execution.title}`,
-            `Approval question: ${execution.question}`,
-            "Treat the following Markdown as the exact approved snapshot. Do not replace it with a new plan or ask for approval again.",
-            "<approved-plan-markdown>",
-            execution.plan,
-            "</approved-plan-markdown>",
-            "Implement the approved plan with the normal Agent tools, then report the result.",
-          ].join("\n");
+    const instruction = approvedPlanInstruction(execution);
     const internalId = `approved-${kind}:${execution.id}`;
     const internalMessage: AgentMessage = {
       role: "user",

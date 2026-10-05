@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS session_todo (
   status     TEXT NOT NULL CHECK (status IN ('pending', 'in_progress', 'completed', 'cancelled')),
   priority   TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('high', 'medium', 'low')),
   updated_at INTEGER NOT NULL,
+  step_id    TEXT CHECK (step_id IS NULL OR (length(step_id) BETWEEN 1 AND 64)),
   PRIMARY KEY (session_id, position)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_session_todo_active
@@ -309,7 +310,11 @@ CREATE TABLE IF NOT EXISTS plan_approvals (
   execution_id          TEXT UNIQUE,
   execution_state       TEXT CHECK (execution_state IN (
     'queued', 'running', 'completed', 'interrupted'
-  ))
+  )),
+  steps_json            TEXT,
+  design_json           TEXT,
+  resolved_steps_json   TEXT,
+  resolved_design_json  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_plan_approvals_session
   ON plan_approvals(session_id, created_at DESC);

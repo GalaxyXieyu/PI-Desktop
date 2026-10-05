@@ -6,6 +6,8 @@
 import {
   normalizeGlobalPermissionMode,
   normalizeProposalKind,
+  validatePlanSteps,
+  validatePlanDesign,
   type PlanExecution,
 } from "@pi-desktop/shared";
 
@@ -37,6 +39,17 @@ export function planExecutionFromUnknown(value: unknown): PlanExecution | null {
   ) {
     return null;
   }
+  const metadata: Pick<PlanExecution, "steps" | "design"> = {};
+  if (value.steps !== undefined && value.steps !== null) {
+    const result = validatePlanSteps(value.steps);
+    if (!result.ok) return null;
+    if (result.value.length) metadata.steps = result.value;
+  }
+  if (value.design !== undefined && value.design !== null) {
+    const result = validatePlanDesign(value.design);
+    if (!result.ok) return null;
+    if (Object.keys(result.value).length) metadata.design = result.value;
+  }
   return {
     id: value.id,
     proposalId: value.proposalId,
@@ -55,6 +68,7 @@ export function planExecutionFromUnknown(value: unknown): PlanExecution | null {
       value.targetPermissionMode,
     ),
     state,
+    ...metadata,
   };
 }
 

@@ -1,0 +1,116 @@
+[
+  {
+    "name": "steps trims ids, titles, and details; an empty detail becomes absent and a missing dependsOn defaults to an empty array",
+    "kind": "steps",
+    "input": [
+      { "id": " setup ", "title": " Set up the repository ", "detail": "   " },
+      { "id": "impl", "title": " Implement the feature ", "detail": " Follow the spec\nline two ", "dependsOn": [" setup "] }
+    ],
+    "ok": true,
+    "normalized": [
+      { "id": "setup", "title": "Set up the repository", "dependsOn": [] },
+      { "id": "impl", "title": "Implement the feature", "detail": "Follow the spec\nline two", "dependsOn": ["setup"] }
+    ]
+  },
+  {
+    "name": "steps trim Unicode whitespace (U+3000, NBSP) on both sides like ECMAScript trim",
+    "kind": "steps",
+    "input": [{ "id": "a", "title": "　Setup　", "detail": "  notes  " }],
+    "ok": true,
+    "normalized": [{ "id": "a", "title": "Setup", "detail": "notes", "dependsOn": [] }]
+  },
+  {
+    "name": "an empty steps array is a valid no-steps plan",
+    "kind": "steps",
+    "input": [],
+    "ok": true,
+    "normalized": []
+  },
+  {
+    "name": "design trims and lowercases framework and componentLibrary slugs and trims style keywords",
+    "kind": "design",
+    "input": { "framework": " React ", "componentLibrary": " SHADCN/UI ", "styleKeywords": [" Calm ", "Modern"] },
+    "ok": true,
+    "normalized": { "framework": "react", "componentLibrary": "shadcn/ui", "styleKeywords": ["Calm", "Modern"] }
+  },
+  {
+    "name": "design uppercases hex colors and drops an empty color group",
+    "kind": "design",
+    "input": { "colorSystem": { "primary": ["#aAbBcc"], "text": [] } },
+    "ok": true,
+    "normalized": { "colorSystem": { "primary": ["#AABBCC"] } }
+  },
+  {
+    "name": "a design that only carries empty collections normalizes to an empty object",
+    "kind": "design",
+    "input": { "styleKeywords": [], "colorSystem": { "primary": [], "background": [], "text": [], "functional": [] } },
+    "ok": true,
+    "normalized": {}
+  },
+  {
+    "name": "empty slugs normalize away and the font family is trimmed",
+    "kind": "design",
+    "input": { "framework": "", "componentLibrary": "   ", "fontSystem": { "fontFamily": " Inter ", "body": { "size": "16px", "weight": 400 } } },
+    "ok": true,
+    "normalized": { "fontSystem": { "fontFamily": "Inter", "body": { "size": "16px", "weight": 400 } } }
+  },
+  {
+    "name": "steps reject a dependency cycle",
+    "kind": "steps",
+    "input": [
+      { "id": "a", "title": "A", "dependsOn": ["b"] },
+      { "id": "b", "title": "B", "dependsOn": ["a"] }
+    ],
+    "ok": false,
+    "code": "PLAN_STEPS_INVALID",
+    "path": "steps[1].dependsOn[0]"
+  },
+  {
+    "name": "steps reject a dependency on an unknown step",
+    "kind": "steps",
+    "input": [{ "id": "a", "title": "A", "dependsOn": ["x"] }],
+    "ok": false,
+    "code": "PLAN_STEPS_INVALID",
+    "path": "steps[0].dependsOn[0]"
+  },
+  {
+    "name": "steps reject an unknown step key",
+    "kind": "steps",
+    "input": [{ "id": "a", "title": "A", "depndsOn": [] }],
+    "ok": false,
+    "code": "PLAN_STEPS_INVALID",
+    "path": "steps[0].depndsOn"
+  },
+  {
+    "name": "design rejects an rgba() color",
+    "kind": "design",
+    "input": { "colorSystem": { "primary": ["#123456", "rgba(0,0,0,1)"] } },
+    "ok": false,
+    "code": "PLAN_DESIGN_INVALID",
+    "path": "design.colorSystem.primary[1]"
+  },
+  {
+    "name": "design rejects a 73px font size",
+    "kind": "design",
+    "input": { "fontSystem": { "fontFamily": "Inter", "body": { "size": "73px", "weight": 400 } } },
+    "ok": false,
+    "code": "PLAN_DESIGN_INVALID",
+    "path": "design.fontSystem.body.size"
+  },
+  {
+    "name": "design rejects a font weight that is not a multiple of 100",
+    "kind": "design",
+    "input": { "fontSystem": { "fontFamily": "Inter", "body": { "size": "16px", "weight": 150 } } },
+    "ok": false,
+    "code": "PLAN_DESIGN_INVALID",
+    "path": "design.fontSystem.body.weight"
+  },
+  {
+    "name": "design rejects an unknown design key",
+    "kind": "design",
+    "input": { "framework": "react", "stlyeKeywords": ["calm"] },
+    "ok": false,
+    "code": "PLAN_DESIGN_INVALID",
+    "path": "design.stlyeKeywords"
+  }
+]
