@@ -35,7 +35,7 @@ function makeSlice() {
         return copy;
       },
       sessionModeForPlanningState: () => "agent",
-      openPlanArtifact() {},
+      openPlanReview() {},
       notifyInteractivePrompt() {},
       triggerAutoTitleSummarization: async () => {},
       flushPendingSessionConfiguration: async () => {},

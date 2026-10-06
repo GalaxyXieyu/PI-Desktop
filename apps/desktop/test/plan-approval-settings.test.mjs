@@ -33,10 +33,7 @@ const interactionSource = readStoreModuleSync("slices/interaction-slice.ts");
 
 test("plan approval exposes artifact and document entries and remembers the selected mode", () => {
   assert.match(approvalBar, /proposal\.title/);
-  assert.match(
-    approvalBar,
-    /preferredFileWorkPanelTab\(artifactPath, pluginViews\)/,
-  );
+  assert.doesNotMatch(approvalBar, /preferredFileWorkPanelTab/);
   assert.match(approvalBar, /openWorkPanelTabForSession/);
   assert.match(approvalBar, /const isPending = proposal\.status === "pending"/);
   assert.match(approvalControls, /PLAN_APPROVAL_DEFAULT_MODE/);

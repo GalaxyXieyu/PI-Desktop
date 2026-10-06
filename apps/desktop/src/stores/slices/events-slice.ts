@@ -50,10 +50,9 @@ export type EventsSliceDependencies = StoreAccess & {
     state: AppState["planningStates"][string],
     kind: PlanningStateEvent["kind"],
   ) => AppState["sessions"][number]["mode"];
-  openPlanArtifact: (
+  openPlanReview: (
     proposal: NonNullable<AppState["pendingPlans"][string]>,
     openWorkPanelTabForSession: AppState["openWorkPanelTabForSession"],
-    pluginViews: AppState["pluginViews"],
   ) => void;
   notifyInteractivePrompt: (
     sessionId: string,
@@ -102,7 +101,7 @@ export function createEventsSlice({
   runtime,
   withoutRecordKey,
   sessionModeForPlanningState,
-  openPlanArtifact,
+  openPlanReview,
   notifyInteractivePrompt,
   triggerAutoTitleSummarization,
   flushPendingSessionConfiguration,
@@ -204,11 +203,7 @@ export function createEventsSlice({
       projectCheckpointHistory(event.sessionId, event.proposal);
       const checkpoint = get().planCheckpoints[event.sessionId];
       if (event.state === "awaiting_approval" && isPendingPlan(checkpoint)) {
-        openPlanArtifact(
-          checkpoint,
-          get().openWorkPanelTabForSession,
-          get().pluginViews,
-        );
+        openPlanReview(checkpoint, get().openWorkPanelTabForSession);
       }
       if (event.state === "awaiting_approval" && !event.proposal) {
         void get().restorePendingPlan(event.sessionId);
@@ -414,11 +409,7 @@ export function createEventsSlice({
         if (event.state === "awaiting_approval") {
           const checkpoint = get().planCheckpoints[envelope.sessionId];
           if (isPendingPlan(checkpoint)) {
-            openPlanArtifact(
-              checkpoint,
-              get().openWorkPanelTabForSession,
-              get().pluginViews,
-            );
+            openPlanReview(checkpoint, get().openWorkPanelTabForSession);
           }
           void get().restorePendingPlan(envelope.sessionId);
           notifyInteractivePrompt(envelope.sessionId, "plan");

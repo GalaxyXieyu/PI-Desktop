@@ -8,7 +8,9 @@ import {
   FILE_MANAGER_PLUGIN_TAB,
   fileManagerPluginTab,
   hasPluginView,
+  planWorkPanelTab,
 } from "../lib/work-panel-tabs";
+import { findPlanByArtifactPath } from "../features/plan/plan-artifact-link";
 
 /**
  * Open one target the transcript named.
@@ -156,6 +158,7 @@ export function useOpenChatFileRef() {
   const openFile = useAppStore((s) => s.openFileInWorkPanel);
   const openUrl = useAppStore((s) => s.openUrlInWorkPanel);
   const openTab = useAppStore((s) => s.openWorkPanelTab);
+  const openTabForSession = useAppStore((s) => s.openWorkPanelTabForSession);
 
   const fileViewAvailable = useMemo(
     () => hasPluginView(pluginViews, FILE_MANAGER_PLUGIN_TAB),
@@ -175,6 +178,13 @@ export function useOpenChatFileRef() {
         const resolved = await resolveRef(path, baseDir);
         if (!resolved) return;
         const hasPosition = line !== undefined || column !== undefined;
+        const plan = !hasPosition && resolved.inProject
+          ? findPlanByArtifactPath(useAppStore.getState(), resolved.relativePath)
+          : undefined;
+        if (plan) {
+          openTabForSession(plan.sessionId, planWorkPanelTab(plan));
+          return;
+        }
         if (
           !hasPosition &&
           resolved.inProject &&
@@ -196,7 +206,7 @@ export function useOpenChatFileRef() {
         openFile(resolved.path, mimeType, { line, column });
       })();
     },
-    [fileViewAvailable, openFile, openTab, openUrl, resolveRef],
+    [fileViewAvailable, openFile, openTab, openTabForSession, openUrl, resolveRef],
   );
 }
 

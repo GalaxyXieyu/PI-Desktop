@@ -60,6 +60,9 @@ const state = {
   workspace: { path: "C:/project" },
   activeSessionId: "session-1",
   pluginViews: [{ pluginId: "pi.file-manager", viewId: "manager" }],
+  pendingPlans: {},
+  planCheckpoints: {},
+  messages: [],
   openFileInWorkPanel: (...args) => calls.files.push(args),
   openUrlInWorkPanel: (...args) => calls.urls.push(args),
   openWorkPanelTab: (tab) => calls.tabs.push(tab),
@@ -95,7 +98,10 @@ const translate = () => ({
 const previewTarget = loadModule("../src/hooks/use-preview-target.ts", {
   react: React,
   "react-i18next": { useTranslation: translate },
-  "../stores/app-store": { useAppStore: (selector) => selector(state) },
+  "../stores/app-store": {
+    useAppStore: Object.assign((selector) => selector(state), { getState: () => state }),
+  },
+  "../features/plan/plan-artifact-link": loadModule("../src/features/plan/plan-artifact-link.ts", {}),
   "../lib/api": {
     api: {
       fsResolveRef: async (ref) => {

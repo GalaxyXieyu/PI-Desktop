@@ -114,7 +114,8 @@ existing rows. The v20→v21→v22 chain remains supported.
 The approval bar offers a secondary document entry for both Plan and Goal
 proposals. Plans with structured metadata show task/design summary chips and
 use the review-and-edit label. The entry opens a session-scoped `plan:<id>` work
-panel tab; the existing artifact opener and approval controls are unchanged.
+panel tab; the artifact opener and chat links to the artifact open the same tab
+(D647), and the approval controls are unchanged.
 Tab sanitization, reordering, deduplication, and session switching retain this
 resource like other work-panel resources.
 

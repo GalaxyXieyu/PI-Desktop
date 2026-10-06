@@ -7,7 +7,7 @@ import {
 } from "../features/plan/plan-draft-model";
 import { usePlanDraft } from "../features/plan/plan-draft-store";
 import { useAppStore } from "../stores/app-store";
-import { planWorkPanelTab, preferredFileWorkPanelTab } from "../lib/work-panel-tabs";
+import { planWorkPanelTab } from "../lib/work-panel-tabs";
 import { IconFileText } from "./icons";
 import { Badge, Button } from "./ui";
 import { PlanBuildControls } from "./plan/PlanBuildControls";
@@ -24,7 +24,6 @@ function copyKey(kind: ProposalKind, name: string): string {
 export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
   const { t } = useTranslation();
   const [draft] = usePlanDraft(proposal);
-  const pluginViews = useAppStore((state) => state.pluginViews);
   const openWorkPanelTabForSession = useAppStore(
     (state) => state.openWorkPanelTabForSession,
   );
@@ -32,14 +31,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
   const copy = (name: string) => t(copyKey(kind, name));
   const artifactPath = proposal.artifact?.relativePath?.trim() || null;
   const isPending = proposal.status === "pending";
-
-  const openArtifact = () => {
-    if (!artifactPath) return;
-    openWorkPanelTabForSession(
-      proposal.sessionId,
-      preferredFileWorkPanelTab(artifactPath, pluginViews),
-    );
-  };
+  const openPlan = () => openWorkPanelTabForSession(proposal.sessionId, planWorkPanelTab(proposal));
 
   return (
     <section
@@ -59,7 +51,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
           {proposal.title.trim() || copy("untitled")}
         </h2>
         <div className="plan-approval-details">
-          <Button size="sm" data-testid="plan-view-plan" onClick={() => openWorkPanelTabForSession(proposal.sessionId, planWorkPanelTab(proposal))}>
+          <Button size="sm" data-testid="plan-view-plan" onClick={openPlan}>
             {copy(proposal.steps?.length || (proposal.design && !isPlanDesignEmpty(proposal.design)) ? "reviewEditPlan" : "viewPlan")}
           </Button>
           {!!draft.steps.length && <Badge>{t("plan.taskCount", { count: draft.steps.length })}</Badge>}
@@ -73,7 +65,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
                 path: artifactPath,
               })}
               title={artifactPath}
-              onClick={openArtifact}
+              onClick={openPlan}
             >
               <IconFileText size={14} aria-hidden />
               <span className="plan-approval-artifact-label">
