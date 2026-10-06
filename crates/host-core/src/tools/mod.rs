@@ -4943,6 +4943,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn edit_legacy_terminal_newline_only_change_reports_no_change() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("legacy.txt");
+        let input = "keep\n";
+        std::fs::write(&target, input).unwrap();
+        let result = execute_tool(
+            Some(dir.path()),
+            None,
+            "Edit",
+            &json!({"path": "legacy.txt", "old_string": "\n", "new_string": ""}),
+            5_000,
+        )
+        .await;
+        assert!(!result.ok);
+        assert_eq!(result.error_code.as_deref(), Some("EDIT_NO_CHANGE"));
+        assert_eq!(std::fs::read(&target).unwrap(), input.as_bytes());
+    }
+
+    #[tokio::test]
     async fn read_missing_file_reports_file_not_found() {
         let dir = tempfile::tempdir().unwrap();
         let result = execute_tool(

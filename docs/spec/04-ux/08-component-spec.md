@@ -1206,6 +1206,13 @@ entirely inside the plugin's isolated page:
   the divider restores the default 360px width, clamped by the same live
   minimum and three-column budget, so a reset never breaches the MainChat
   floor.
+- Browser capture and resize: screenshots and raw `Page.captureScreenshot`
+  calls serialize per retained browser page. While a capture is in flight,
+  the page retains the latest requested bounds without changing its native
+  viewport. Capture completion or failure applies those bounds if the page
+  is visible; a hidden page receives them when shown again. Queued captures
+  stay on their original page and fail if that guest was closed. Other pages
+  remain independent, and resizing never triggers an extra screenshot.
 - Persistence: all session contexts are renderer runtime state only. On app
   startup, open state, tabs, active-tab selection, file requests, and Browser
   resources reset; only the committed preferred `{width}` remains in
@@ -3341,6 +3348,10 @@ Anatomy:
   feedback before opening a turn or replacing history. Native Pi sessions do
   not support Desktop-managed MCP selections. Existing command aliases win
   collisions. See `docs/adr/composer-mcp-invocations.md`.
+- Active Skill commands use `/skill:<id>` for builtin, plugin, and user Skills.
+  Completion inserts this explicit prefix; sending resolves it to the unchanged
+  Skill ID. Unprefixed names are not Skill aliases; existing app commands and
+  prompt templates keep their names. Saved Skill mentions remain unchanged.
 - A whitespace-delimited `/` later in the draft offers active Skills only.
   Completion replaces only the token under the cursor, so several Skills and
   ordinary text can coexist in one prompt.

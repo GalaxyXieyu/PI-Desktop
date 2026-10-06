@@ -40,9 +40,10 @@
 ### E2E-LIVE-VOICE-public-settings-and-reconnect
 
 - **Preconditions:** A built production Renderer and real Electron/Main/Host,
-  isolated data/profile/project, developer mode off, a local TLS Realtime
-  fixture and synthetic microphone. Trust only the fixture CA in the child
-  process; do not disable TLS, sender, sandbox or microphone checks.
+  isolated data/profile/project, developer mode off, a local TLS or loopback
+  HTTP Realtime fixture and synthetic microphone. For TLS, trust only the
+  fixture CA in the child process; do not disable TLS, sender, sandbox or
+  microphone checks.
 - **Steps:** Open Live from Composer while disabled and follow Open settings.
   Find Voice through settings search, bind the fixture account, enable Live,
   connect, unmute, receive audio/captions, mute and hang up. Cancel a delayed
@@ -55,10 +56,14 @@
   call. Settings survive restart without reconnecting. Legacy Dictation
   settings are unchanged; a voice-only call creates no Agent session.
 - **Coverage:** `pnpm test:e2e:live-voice` drives the built app and its concrete
-  Realtime GA adapter against local WSS; `live-voice-owner.test.mjs` bundles
-  the production owner module and rejects other files/frames. Fixture audio
-  is not physical-device or real-provider acceptance. Commands and results
-  are recorded in `docs/implementation/live-voice-public-readiness.md`.
+  Realtime GA adapter against local WSS; `pnpm test:e2e:live-voice --
+  --plain-http` repeats the call flow against a loopback `ws://` endpoint.
+  `live-voice-websocket-endpoint.test.mjs` connects the production transport to
+  a local loopback WebSocket and verifies proxy refusal; `live-voice-owner.test.mjs`
+  bundles the production owner module and rejects other files/frames. Fixture
+  audio is not physical-device or real-provider acceptance. Commands and
+  results are recorded in
+  `docs/implementation/live-voice-public-readiness.md`.
 - **Specs:** [Live Voice](../03-runtime/live-voice.md).
 
 ### E2E-LIVE-VOICE-provider-call-lifecycle
@@ -97,6 +102,30 @@
   toggle/cancel actions, including that Escape never ends a connected call.
   The full Electron flow and real-provider/device compatibility remain
   unverified until their respective isolated acceptance environments are run.
+
+### E2E-LIVE-VOICE-realtime-plaintext-user-endpoint
+
+- **Preconditions:** Isolated desktop profile with Live Voice enabled and an
+  OpenAI-compatible API-key Provider whose base URL is a local plain-HTTP
+  Realtime fixture such as `http://127.0.0.1:<port>/v1`. Do not use a real
+  provider account.
+- **Steps:** Bind the Realtime adapter to that Provider and start a call with
+  `networkPolicy.mode` at its default (`relaxed`). End the call, switch the
+  mode to `strict` and start again. Repeat in `relaxed` with a system proxy
+  that does not bypass the fixture host.
+- **Expected:** In `relaxed` mode the call connects over
+  `ws://127.0.0.1:<port>/v1/realtime?model=…` and the one-time plaintext
+  notice is raised. In `strict` mode, and on a proxied route, the call fails
+  before any socket opens with a network-policy error. An `https` base URL
+  still connects only over `wss`; Gemini never uses `ws` and Codex SDP stays
+  HTTPS-only.
+- **Specs:** [Live Voice](../03-runtime/live-voice.md),
+  [ADR 0304](../../adr/0304-user-supplied-endpoint-trust.md).
+- **Acceptance:** `apps/desktop/test/live-voice-websocket-endpoint.test.mjs`
+  covers the scheme mapping, the user/third-party split and the refused base
+  URL shapes; the network guard's `relaxed`/`strict` verdict is covered by the
+  existing public-network tests. The full Electron flow remains unverified
+  until its isolated acceptance environment is run.
 
 ### E2E-LIVE-VOICE-four-stage-ui
 
@@ -2372,9 +2401,12 @@ identify the platform validation still needed.
   changes occur. The keyboard hint includes Shift+Enter and a submit hint, while the
   command/file hint includes `/` and `@`. The slash menu still contains `/new`,
   `/compact`, `/agent-mode`, `/plan-mode`, and `/goal-mode`, followed by a
-  Skills group at the bottom. Selecting the Skill inserts its slash id; sending
-  it keeps the typed command chip visible and the model calls `Skill` with that
-  id before answering. zh-CN shows the matching localized copy, including
+  Skills group at the bottom. Selecting a Skill inserts `/skill:<id>`; sending
+  it keeps the typed command chip visible and the model calls `Skill` with the
+  original ID before answering. Verify builtin, plugin, and user Skill prefixes,
+  multiple inline references, and a prompt template sharing the unprefixed
+  Skill name; inactive and unknown Skills must not resolve. zh-CN shows the
+  matching localized copy, including
   `Shift+Enter for newline · Use Send to submit`.
   Long descriptions use only the space remaining after command names and
   hints, so short names stay fully visible. Descriptions and oversized names
@@ -4239,7 +4271,9 @@ identify the platform validation still needed.
   the before/after drop indicator, resulting order, and unchanged active tab;
   hold a drag at each strip edge until hidden tabs scroll into view, then verify
   the indicator follows the newly visible targets. Repeat with
-  `Alt+ArrowLeft`/`Alt+ArrowRight`. 4) Click `+` twice and verify each click
+  `Alt+ArrowLeft`/`Alt+ArrowRight`. With only one or two tabs, drag unused
+  header space to move the native window; tab and action clicks must still
+  work without moving it. 4) Click `+` twice and verify each click
   creates and activates a separate New launcher tab. Confirm the launcher body
   contains Review plus each in-scope plugin view exactly once as clickable rows;
   there is no work-panel dropdown or popup. Click Browser from one New tab and
@@ -4432,6 +4466,24 @@ identify the platform validation still needed.
 - **Acceptance**: Quality, Security
 - **Milestone**: M5
 - **Status**: Draft (manual)
+
+#### E2E-BROWSER-capture-resize: Capture completion preserves the latest viewport
+
+- **Preconditions**: Isolated Electron profile and a local responsive page
+  taller than the visible browser viewport. No provider account is needed.
+- **Steps**: Start a full-page screenshot, then resize the browser hole twice
+  before Chromium completes it. Repeat while alternating larger and smaller
+  sizes and through raw `Page.captureScreenshot`. Queue overlapping captures,
+  change resource tabs, fail a capture, and close a tab with a queued capture.
+- **Expected**: The completed capture does not restore a stale viewport. The
+  page's `innerWidth`/`innerHeight` match the latest requested bounds. Captures
+  on one page serialize without blocking a sibling page. Failed capture
+  releases resize handling. Closing a page cannot redirect its queued capture
+  to another page. No screenshot is repeated to repair layout.
+- **Status**: Native Electron capture/resize path automated by
+  `node scripts/e2e-browser-capture-resize.mjs` (artifacts retained). The
+  production Host/Pane/CDP service paths for failure, queueing and tab closure
+  are covered by `apps/desktop/test/browser-capture-resize.test.mjs`.
 
 #### E2E-BROWSER-session-preview-race: Session switching does not expose a stale preview
 
@@ -6519,9 +6571,10 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   1. Start an Agent-mode conversation and submit a task covered by the root
      instruction.
   2. Let the agent read or edit `packages/api/handler.ts`.
-  3. Add `packages/api/AGENTS.override.md`, then have the agent access another
+  3. Have the agent read an attachment outside the project root.
+  4. Add `packages/api/AGENTS.override.md`, then have the agent access another
      file in that directory.
-  4. Edit the root instruction while the session is idle, then submit a
+  5. Edit the root instruction while the session is idle, then submit a
      follow-up task.
 - **Expected**: The initial runtime receives the root chain. Before the file
   tool executes, the nested instruction is appended after its root source and
@@ -6529,8 +6582,13 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `AGENTS.md`; `CLAUDE.md` and `.claude/CLAUDE.md` are fallback names. The idle
   follow-up uses changed root content rather than reusing the prior runtime.
   Empty, unreadable, oversized, and out-of-root instruction files do not block
-  the turn; combined UTF-8 content is capped at 32 KiB. If path-specific
-  resolution exceeds its two-second deadline or the host is unavailable, the
+  the turn; combined UTF-8 content is capped at 32 KiB. A file tool whose target
+  is outside the project root, or targets the root itself, keeps the root chain
+  rather than clearing the project instructions; instruction files are still
+  read only from inside the root. A fixture-backed sidecar run verifies that a
+  nested read applies nested rules and a following attachment read restores the
+  root rules without loading an outside `AGENTS.md`. If path-specific resolution exceeds its
+  two-second deadline or the host is unavailable, the
   file tool continues with the base chain and does not retain a sibling
   directory's rules. Repeated file tools in the same directory during one
   prompt reuse one path-resolution claim; the next prompt resolves again so
@@ -6540,9 +6598,10 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Specs linked**: `03-runtime/02-agent-runtime.md`
 - **Acceptance**: C (chat/stream), F (persistence)
 - **Milestone**: M5
-- **Status**: Partially automated (`project-instructions.test.ts`,
-  `runtime.test.ts`); full
-  provider/UI journey Draft
+- **Status**: Resolver and runtime behavior are automated in
+  `project-instructions.test.ts` and `runtime.test.ts`; the fixture-backed
+  sidecar scenario runs through `pnpm test:e2e:hosted-search`. The broader full
+  provider/UI journey remains Draft.
 
 #### E2E-AGENTS-002: Global settings and project menus manage instruction files
 
@@ -11346,13 +11405,15 @@ This test plan spec is accepted when:
   end, the whole-line deletion removes that line without leaving a blank line or
   touching its neighbours, and the CRLF file keeps CRLF endings. The missing
   `old_string` fails with `EDIT_LEGACY_MATCH_FAILED` and leaves the file
-  unchanged.
+  unchanged. A replacement whose only effect would be toggling the terminal
+  newline fails with `EDIT_NO_CHANGE` and leaves the file unchanged.
 - **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §11
 - **Acceptance**: E (tools & permissions)
 - **Milestone**: M5+
 - **Status**: Automated (host-core unit tests:
   `edit_legacy_replacement_preserves_unmatched_bytes`,
   `edit_legacy_identical_replacement_leaves_file_unchanged`,
+  `edit_legacy_terminal_newline_only_change_reports_no_change`,
   `edit_accepts_legacy_old_string_new_string_shape`)
 
 #### E2E-142: Background delegation converges through TaskWait and honors permission scopes
@@ -13756,23 +13817,31 @@ are withdrawn with ADR 0165.
 - **Preconditions**: Start PI-Desktop with `PI_DESKTOP_MCP_CONTROL=1`. A durable
   session exists whose `session.compaction` record (`summary` / `retainedTail` /
   `details.modifiedFiles`) alone serializes to more than the 512 KiB MCP result
-  limit.
+  limit. A second durable session exists whose `session.compactions` history
+  alone does — the newest `compaction` is already compact, but several history
+  entries each carry their own `summary` / `retainedTail` /
+  `details.modifiedFiles` (mocode #506).
 - **Steps**: 1) Read `mcp-control.json`, use its URL and bearer token, and
   complete the MCP handshake. 2) Call `pi_session_get` for that session with any
   `messageLimit` / `contentLimit` / `messageBefore`. 3) Inspect
-  `structuredContent`. 4) Repeat for a small session.
+  `structuredContent`. 4) Repeat for the history-heavy session with the smallest
+  page (`messageLimit: 1`, `contentLimit: 1`). 5) Repeat for a small session.
 - **Expected**: The answer is not the `{truncated: true, reason:
   "MCP_RESULT_LIMIT", preview}` envelope; `session.messages` carries the
   requested transcript page; `session.compaction` keeps `createdAt` and
   `details.generation` while `summary`, `retainedTail`, and
-  `details.modifiedFiles` are absent. The small session's answer is unchanged.
+  `details.modifiedFiles` are absent. Every `session.compactions` entry keeps its
+  scalar identity and drops those same unbounded fields, so the history-heavy
+  session returns a real page even at `messageLimit: 1` / `contentLimit: 1`. The
+  small session's answer is unchanged.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` §13d
 - **Acceptance**: C (sessions), Quality
 - **Milestone**: M6+
 - **Status**: The local MCP server contract test in
   `apps/desktop/test/mcp-control.test.mjs` exercises authenticated JSON-RPC
-  `tools/call` for both oversized and under-limit `pi_session_get` results. The
-  separate full Electron-to-Host journey remains release qualification.
+  `tools/call` for oversized (current record, compaction history, and
+  history-only) and under-limit `pi_session_get` results. The separate full
+  Electron-to-Host journey remains release qualification.
 
 #### E2E-234: Workspace security denylist and ignore layers
 
@@ -14964,16 +15033,19 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   2. Inspect the first provider request and its tool list.
   3. Confirm the model calls `Skill` with the exact id without calling
      `ToolSearch` first, and that the returned document is the skill body.
-  4. Send `/<skill-id>` from the composer and inspect the following turn.
+  4. Select a Skill and send `/skill:<skill-id>` from the composer; inspect the
+     following turn and confirm the original Skill id reaches the tool.
   4a. Add a second active Skill with `/` after the first token, submit the
       prompt, switch away from the session, and reopen it.
   5. Switch the session to Plan mode and inspect the tool list again.
   6. Disable or remove every Skill and start another Agent turn.
 - **Expected**: Whenever the skill catalog is non-empty, `Skill` ships with the
   first request and never appears under `# On-demand tools`, so both a matching
-  task and a `/skill-id` invocation load the body without a discovery round
+  task and a `/skill:<skill-id>` invocation load the body without a discovery round
   trip. Both explicit Skills load in their selected order; after reopening,
   each remains a separate transcript chip beside the user's prompt text.
+  An unprefixed name that matches a Skill remains an ordinary command or
+  template, not a Skill alias.
   `ToolSearch` still exists for the other on-demand capabilities and
   never returns `Skill`. Plan mode omits the tool and the `# Skills` section,
   and an empty catalog registers no `Skill` tool at all.

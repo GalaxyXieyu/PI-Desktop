@@ -545,7 +545,9 @@ first line and after the match on its last line is kept. The substring result
 is lowered to one line-anchored op over only the lines that change and applied
 against the live tag, so line-ending and BOM preservation and the provenance
 check behave as for any other `Edit`. A replacement identical to `old_string`
-fails with `EDIT_NO_CHANGE`.
+fails with `EDIT_NO_CHANGE`. A replacement whose only effect would be toggling
+the file's terminal newline also fails with `EDIT_NO_CHANGE`, because line-
+anchored operations preserve that newline state.
 
 `MUTATION_RETRY_BUDGET_EXHAUSTED` is not in this table because it is not an
 `Edit` result: the tool call already failed with one of the codes above, and the
