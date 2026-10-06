@@ -236,6 +236,7 @@ export const en = {
     sessionMissing: "That session no longer exists",
   },
   chat: {
+    planFeedbackPlaceholder: "Describe the changes you want; sending rejects this plan and replans",
     tableActions: "Table actions",
     markdownPlainTextFallback: "Large response shown as plain text to keep the conversation responsive.",
     copyTableMarkdown: "Copy table as Markdown",

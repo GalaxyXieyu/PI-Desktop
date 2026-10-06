@@ -91,7 +91,7 @@ test("composer send/stop button follows draft content and the visible session's 
     /className="stop-btn"[\s\S]*?\) : null\}[\s\S]*?className="send-btn"/,
     "Stop must not render beside an always-present Send button",
   );
-  assert.match(composer, /const inputBlocked = approvalPending \|\| pasting \|\| nativeInputBlocked;/);
+  assert.match(composer, /const inputBlocked = pasting \|\| nativeInputBlocked;/);
   assert.match(composer, /const controlsBlocked = approvalPending \|\| nativeSession;/);
   assert.match(composer, /contentEditable=\{!inputBlocked\}/);
   assert.match(composer, /disabled=\{controlsBlocked\}/);

@@ -229,6 +229,7 @@ export const de = {
     sessionMissing: "Diese Sitzung existiert nicht mehr",
   },
   "chat": {
+    planFeedbackPlaceholder: "Änderungswünsche eingeben; Senden lehnt diesen Plan ab",
     "tableActions": "Tabellenaktionen",
     "markdownPlainTextFallback": "Große Antworten werden zur besseren Reaktionsfähigkeit als Klartext angezeigt.",
     "copyTableMarkdown": "Tabelle als Markdown kopieren",

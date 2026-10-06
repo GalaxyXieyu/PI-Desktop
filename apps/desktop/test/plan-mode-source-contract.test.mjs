@@ -147,17 +147,18 @@ test("the component spec assigns mode ownership to Composer", () => {
 });
 
 test("plan approval sends exact identities and waits for host confirmation", () => {
-  assert.match(planControlsSource, /proposalId: proposal\.id/);
-  assert.match(planControlsSource, /sessionId: proposal\.sessionId/);
-  assert.match(planControlsSource, /turnId: proposal\.turnId/);
-  assert.match(planControlsSource, /toolCallId: proposal\.toolCallId/);
-  assert.match(planControlsSource, /version: proposal\.version/);
-  // The approve half is built by the shared draft-model helper so the bar and
-  // the tab cannot drift; reject stays an inline identity-only request.
+  assert.match(planDraftModelSource, /proposalId: proposal\.id/);
+  assert.match(planDraftModelSource, /sessionId: proposal\.sessionId/);
+  assert.match(planDraftModelSource, /turnId: proposal\.turnId/);
+  assert.match(planDraftModelSource, /toolCallId: proposal\.toolCallId/);
+  assert.match(planDraftModelSource, /version: proposal\.version/);
+  // Both halves come from the shared draft-model helpers so the bar, the tab,
+  // and composer feedback cannot drift.
   assert.match(
     planControlsSource,
-    /action === "approve"\s*\?\s*buildApproveRequest\([\s\S]*?\)\s*:\s*\{[\s\S]*?\.\.\.identity,\s*action\s*\}/,
+    /action === "approve"\s*\?\s*buildApproveRequest\([\s\S]*?\)\s*:\s*buildRejectRequest\(proposal\)/,
   );
+  assert.match(planDraftModelSource, /\.\.\.proposalIdentity\(proposal\), action: "reject"/);
   assert.match(planDraftModelSource, /targetPermissionMode: mode/);
   assert.match(planDraftModelSource, /proposal\.kind === "plan" \? revision : undefined/);
   assert.doesNotMatch(planControlsSource, /request_changes/);
@@ -212,13 +213,14 @@ test("mode commands configure the active session instead of only changing defaul
   assert.match(modeCommandBlock, /else if \(store\.settings\)/);
 });
 
-test("pending approval keeps the draft while gating every composer control", () => {
+test("pending approval keeps typing open while gating every configuration control", () => {
   assert.match(composerSource, /contentEditable=\{!inputBlocked\}/);
   assert.match(composerSource, /aria-readonly=\{inputBlocked\}/);
   assert.match(composerSource, /enabled: !inputBlocked/);
   assert.match(composerSource, /disabled=\{controlsBlocked\}/);
   assert.match(composerSource, /const controlsBlocked = approvalPending \|\| nativeSession;/);
-  assert.match(composerSource, /const sendBlocked = approvalPending \|\| pasting \|\| nativeInputBlocked;/);
+  assert.match(composerSource, /const sendBlocked = pasting \|\| nativeInputBlocked;/);
+  assert.match(composerSource, /approvalPending \? "chat\.planFeedbackPlaceholder"/);
   assert.match(storeSource, /if \(get\(\)\.pendingPlans\[sessionId\]\?\.status === "pending"\) return/);
 });
 

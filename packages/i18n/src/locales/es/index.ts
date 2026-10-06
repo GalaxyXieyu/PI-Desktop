@@ -229,6 +229,7 @@ export const es = {
     sessionMissing: "Esa sesión ya no existe",
   },
   "chat": {
+    planFeedbackPlaceholder: "Escribe los cambios como comentario; enviar rechaza este plan",
     "tableActions": "Acciones de tabla",
     "markdownPlainTextFallback": "La respuesta extensa se muestra como texto sin formato para mantener la fluidez.",
     "copyTableMarkdown": "Copiar tabla como Markdown",

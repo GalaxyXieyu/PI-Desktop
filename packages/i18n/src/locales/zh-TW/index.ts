@@ -231,6 +231,7 @@ export const zhTW = {
     sessionMissing: "該對話已不存在",
   },
   chat: {
+    planFeedbackPlaceholder: "輸入修改意見，送出後會拒絕目前計畫並交給 agent 重新規劃",
     tableActions: "表格操作",
     markdownPlainTextFallback: "內容較長，為維持介面回應速度，現以純文字顯示。",
     copyTableMarkdown: "複製表格為 Markdown",

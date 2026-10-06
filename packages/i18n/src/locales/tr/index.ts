@@ -238,6 +238,7 @@ export const tr = {
     sessionMissing: "Bu oturum artık mevcut değil",
   },
   chat: {
+    planFeedbackPlaceholder: "Değişiklikleri geri bildirim olarak yazın; göndermek bu planı reddeder",
     tableActions: "Tablo işlemleri",
     markdownPlainTextFallback: "Büyük yanıtlar arayüzün duyarlı kalması için düz metin olarak gösterilir.",
     copyTableMarkdown: "Tabloyu Markdown olarak kopyala",

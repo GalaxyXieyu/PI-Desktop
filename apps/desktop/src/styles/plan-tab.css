@@ -65,7 +65,13 @@
   margin-top: 16px;
 }
 
-.plan-tab-section h2 {
+/* The immutable plan body reads like chat prose; long paths wrap at word
+   boundaries so tables keep usable column widths. */
+.plan-markdown {
+  overflow-wrap: break-word;
+}
+
+.plan-tab-section h2:not(.prose-chat *) {
   margin-bottom: 12px;
   padding-bottom: 6px;
   border-bottom: 1px solid var(--ds-border-default);
@@ -73,7 +79,7 @@
   font-weight: var(--font-weight-semibold);
 }
 
-.plan-tab-section h3 {
+.plan-tab-section h3:not(.prose-chat *) {
   margin-top: 10px;
   margin-bottom: 6px;
   font-size: var(--text-sm);
@@ -81,7 +87,7 @@
   color: var(--ds-text-primary);
 }
 
-.plan-tab-section h4 {
+.plan-tab-section h4:not(.prose-chat *) {
   margin-top: 8px;
   margin-bottom: 4px;
   font-size: var(--text-xs);

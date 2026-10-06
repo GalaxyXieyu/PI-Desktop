@@ -228,6 +228,7 @@ export const ptBR = {
     sessionMissing: "Essa sessão não existe mais"
   },
   chat: {
+    planFeedbackPlaceholder: "Digite as alterações como feedback; enviar rejeita este plano",
     tableActions: "Ações da tabela",
     markdownPlainTextFallback: "Respostas extensas são exibidas como texto simples para manter a interface responsiva.",
     copyTableMarkdown: "Copiar tabela como Markdown",

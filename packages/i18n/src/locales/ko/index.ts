@@ -238,6 +238,7 @@ export const ko = {
     sessionMissing: "해당 세션이 더 이상 존재하지 않습니다",
   },
   chat: {
+    planFeedbackPlaceholder: "수정 의견을 입력하세요. 보내면 현재 계획이 거부됩니다",
     tableActions: "표 작업",
     markdownPlainTextFallback: "긴 응답은 화면의 반응성을 유지하기 위해 일반 텍스트로 표시됩니다.",
     copyTableMarkdown: "표를 Markdown으로 복사",

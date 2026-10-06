@@ -13,6 +13,7 @@ import { api } from "../../../../lib/api";
 import { draftKeyForSession } from "../../../../lib/composer-draft-cache";
 import { runExtensionCommand, runPaletteCommand } from "../../../../lib/commands";
 import { resolveComposerCommand } from "../../../../hooks/use-composer-autocomplete";
+import { buildRejectRequest } from "../../../plan/plan-draft-model";
 import {
   parseSlashSubmission,
   resolveSlashDispatch,
@@ -212,6 +213,18 @@ export function useComposerSubmit({
     if (sendBlocked) {
       if (pasting) showToast(t("chat.pasteInProgress"), { variant: "info" });
       return;
+    }
+    // A message typed during plan approval is change feedback: it rejects the
+    // pending proposal, then queues behind the stopping turn like any prompt.
+    const pendingPlan = activeSessionId ? useAppStore.getState().pendingPlans[activeSessionId] : undefined;
+    if (pendingPlan?.status === "pending") {
+      try {
+        await useAppStore.getState().resolvePlan(buildRejectRequest(pendingPlan));
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+        return;
+      }
+      steering = false;
     }
     invalidatePromptEnhancement();
     const submittedDraftKey = draftKey;

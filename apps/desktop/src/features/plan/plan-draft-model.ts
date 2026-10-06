@@ -169,14 +169,24 @@ export function buildApproveRequest(
   revision?: PlanRevision,
 ): PlanResolveRequest {
   return {
+    ...proposalIdentity(proposal),
+    action: "approve",
+    targetPermissionMode: mode,
+    ...(proposal.kind === "plan" ? revision : undefined),
+  };
+}
+
+export function buildRejectRequest(proposal: PlanProposal): PlanResolveRequest {
+  return { ...proposalIdentity(proposal), action: "reject" };
+}
+
+function proposalIdentity(proposal: PlanProposal) {
+  return {
     proposalId: proposal.id,
     sessionId: proposal.sessionId,
     turnId: proposal.turnId,
     toolCallId: proposal.toolCallId,
     version: proposal.version,
-    action: "approve",
-    targetPermissionMode: mode,
-    ...(proposal.kind === "plan" ? revision : undefined),
   };
 }
 

@@ -194,7 +194,7 @@ export function PlanDocument({
     <p className="plan-overview">{proposal.question}</p>
     <section className="plan-tab-section" aria-label={t("plan.document")}>
       <h2>{t("plan.document")}</h2>
-      <Markdown source={proposal.markdown} />
+      <div className="plan-markdown prose-chat"><Markdown source={proposal.markdown} /></div>
     </section>
     {editing && submittedDesign && draft.design
       ? <PlanDesignEditor design={draft.design} dispatch={dispatch} />

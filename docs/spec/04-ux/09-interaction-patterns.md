@@ -992,9 +992,12 @@ another session never covers it or moves focus; returning to the originating
   session restores the renderer-lifetime snapshot; while the host remains alive,
   `plans.pending` can rehydrate a still-pending row. The approval card does not
   expose a validity/deadline concept.
-Mode/provider/model/permission/shell configuration and new prompts remain
-disabled while an active `pending` approval or turn exists. During pending
-approval the existing draft remains in the textarea but is read-only; only
+Mode/provider/model/permission/shell configuration remains disabled while an
+active `pending` approval or turn exists. During pending approval the textarea
+stays editable and its placeholder says that sending is feedback: submitting a
+message first rejects the pending proposal through the normal `plans.resolve`
+reject, then sends the message as the next prompt (queued behind the stopping
+turn when needed); a refused reject keeps the draft and sends nothing (D649).
 Approve and Reject remain enabled on the approval surface. Reject, expiry, or
 interruption re-enables them; terminal proposal snapshots do not keep the gate
 closed. The renderer retains the latest checkpoint/execution status per session

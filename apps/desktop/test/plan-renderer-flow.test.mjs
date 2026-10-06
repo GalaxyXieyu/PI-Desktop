@@ -52,13 +52,13 @@ test("each pending proposal restores the remembered approval choice", () => {
   assert.doesNotMatch(approvalControls, /state\.settings|planApprovalPermissionMode/);
 });
 
-test("pending input is retained but every composer/model mutation control is gated", () => {
+test("pending input stays editable but every composer/model mutation control is gated", () => {
   assert.match(composer, /contentEditable=\{!inputBlocked\}/);
   assert.match(composer, /aria-readonly=\{inputBlocked\}/);
   assert.match(composer, /enabled: !inputBlocked/);
   assert.match(composer, /disabled=\{controlsBlocked\}/);
   assert.match(composer, /const controlsBlocked = approvalPending \|\| nativeSession;/);
-  assert.match(composer, /const sendBlocked = approvalPending \|\| pasting \|\| nativeInputBlocked;/);
+  assert.match(composer, /const sendBlocked = pasting \|\| nativeInputBlocked;/);
   assert.match(store, /pendingPlans\[sessionId\]\?\.status === "pending"/);
   assert.match(store, /pendingPlans\[resolution\.sessionId\]/);
 });

@@ -229,6 +229,7 @@ export const fr = {
     sessionMissing: "Cette session n'existe plus",
   },
   "chat": {
+    planFeedbackPlaceholder: "Saisissez vos modifications ; l'envoi rejette ce plan",
     "tableActions": "Actions du tableau",
     "markdownPlainTextFallback": "La réponse volumineuse est affichée en texte brut pour préserver la réactivité.",
     "copyTableMarkdown": "Copier le tableau en Markdown",
