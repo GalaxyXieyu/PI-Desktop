@@ -614,7 +614,6 @@ export const zhCN = {
     stepTitleLabel: "任务标题",
     untitledStep: "未命名任务",
     addDetail: "添加详情",
-    hideDetail: "收起详情",
     stepDetailLabel: "任务详情",
     stepDetailPlaceholder: "此任务的可选详情",
     wouldCreateCycle: "会形成循环依赖",

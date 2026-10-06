@@ -139,7 +139,7 @@ function readPlanDom(state) {
       stepId: row.getAttribute("data-step-id") || "",
       title: text(row.querySelector(".plan-step-title")),
       editing: Boolean(row.querySelector('[data-testid="plan-step-title-input"]')),
-      deps: [...row.querySelectorAll('[data-testid="plan-step-deps"] .badge')].map(text),
+      deps: [...row.querySelectorAll('[data-testid="plan-step-deps"] .badge')].map((badge) => badge.getAttribute("title")),
     }));
     const progressSteps = [...document.querySelectorAll('[data-testid="plan-progress-step"]')].map((row) => ({
       stepId: row.getAttribute("data-step-id") || "",

@@ -619,7 +619,6 @@ export const ko = {
     stepTitleLabel: "작업 제목",
     untitledStep: "제목 없는 작업",
     addDetail: "세부 정보 추가",
-    hideDetail: "세부 정보 숨기기",
     stepDetailLabel: "작업 세부 정보",
     stepDetailPlaceholder: "이 작업의 선택적 세부 정보",
     wouldCreateCycle: "순환 참조가 발생합니다",

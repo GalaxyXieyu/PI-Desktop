@@ -610,7 +610,6 @@ export const de = {
     stepTitleLabel: "Aufgabentitel",
     untitledStep: "Unbenannte Aufgabe",
     addDetail: "Detail hinzufügen",
-    hideDetail: "Detail ausblenden",
     stepDetailLabel: "Aufgabendetail",
     stepDetailPlaceholder: "Optionales Detail zu dieser Aufgabe",
     wouldCreateCycle: "Würde einen Zyklus erzeugen",

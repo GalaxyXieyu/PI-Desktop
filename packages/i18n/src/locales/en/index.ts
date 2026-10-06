@@ -622,7 +622,6 @@ export const en = {
     stepTitleLabel: "Task title",
     untitledStep: "Untitled task",
     addDetail: "Add detail",
-    hideDetail: "Hide detail",
     stepDetailLabel: "Task detail",
     stepDetailPlaceholder: "Optional detail for this task",
     wouldCreateCycle: "Would create a cycle",

@@ -7,9 +7,10 @@ import {
   type PlanDraft,
   type PlanDraftAction,
 } from "../../features/plan/plan-draft-model";
-import { Badge, Button, Checkbox, Input, Textarea, TooltipButton } from "../ui";
+import { Button, Checkbox, Input, Textarea, TooltipButton } from "../ui";
 import { AnchoredMenu } from "../settings/AnchoredMenu";
 import { PlanTasksSection } from "./PlanFlowchart";
+import { PlanStepDeps } from "./PlanStepDeps";
 import { IconArrowDown, IconArrowUp, IconPencil, IconPlus, IconTrash } from "../icons";
 
 type Dispatch = (action: PlanDraftAction) => void;
@@ -67,6 +68,7 @@ function StepDependsOnPicker({
   const [open, setOpen] = useState(false);
   const others = steps.filter((candidate) => candidate.id !== step.id);
   if (!others.length) return null;
+  const hasDeps = step.dependsOn.length > 0;
   const toggle = (id: string) => {
     dispatch({
       type: "stepSetDependsOn",
@@ -85,16 +87,20 @@ function StepDependsOnPicker({
       label={t("plan.dependsOn")}
       role="dialog"
       trigger={(ref) => (
-        <Button
+        <button
           ref={ref}
-          size="sm"
+          type="button"
+          className={hasDeps ? "plan-step-deps-trigger" : "plan-step-tag-add plan-step-hover-only"}
           aria-haspopup="dialog"
           aria-expanded={open}
+          title={hasDeps ? t("plan.dependsOn") : undefined}
           data-testid="plan-step-deps-trigger"
           onClick={() => setOpen((value) => !value)}
         >
-          {t("plan.dependsOn")}
-        </Button>
+          {hasDeps
+            ? <PlanStepDeps step={step} steps={steps} />
+            : <><IconPlus size={11} aria-hidden /> {t("plan.dependsOn")}</>}
+        </button>
       )}
     >
       {others.map((candidate) => {
@@ -127,7 +133,8 @@ function StepDependsOnPicker({
 export function PlanStepsEditor({ draft, dispatch }: { draft: PlanDraft; dispatch: Dispatch }) {
   const { t } = useTranslation();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [openDetails, setOpenDetails] = useState<ReadonlySet<string>>(new Set());
+  // Rows with an empty detail field the user just opened.
+  const [addingDetail, setAddingDetail] = useState<string | null>(null);
 
   // A freshly added step asks for its title first.
   useEffect(() => {
@@ -135,29 +142,21 @@ export function PlanStepsEditor({ draft, dispatch }: { draft: PlanDraft; dispatc
   }, [draft.editingStepId]);
 
   const addStep = () => dispatch({ type: "stepAdd", id: newPlanStepId() });
-  const toggleDetail = (id: string) => {
-    setOpenDetails((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
 
   return (
     <PlanTasksSection steps={draft.steps}>
       <ol className="plan-task-list plan-steps-editor">
         {draft.steps.map((step, index) => {
-          const detailOpen = openDetails.has(step.id) || !!step.detail;
+          const detailOpen = !!step.detail || addingDetail === step.id;
           return (
             <li key={step.id} className="plan-step-row" data-testid="plan-step-row" data-step-id={step.id}>
               <div className="plan-step-line">
-                <span className="plan-step-index">{index + 1}.</span>
                 <span
                   className="plan-step-status"
                   role="img"
                   aria-label={t("plan.status.pending")}
                 />
+                <span className="plan-step-index">{index + 1}</span>
                 {editingId === step.id ? (
                   <StepTitleInput
                     step={step}
@@ -166,11 +165,21 @@ export function PlanStepsEditor({ draft, dispatch }: { draft: PlanDraft; dispatc
                   />
                 ) : (
                   <span
-                    className="plan-step-title"
-                    onDoubleClick={() => setEditingId(step.id)}
+                    className="plan-step-title plan-step-title--editable"
+                    onClick={() => setEditingId(step.id)}
                   >
                     {step.title || <span className="plan-tab-muted">{t("plan.untitledStep")}</span>}
                   </span>
+                )}
+                <StepDependsOnPicker step={step} steps={draft.steps} dispatch={dispatch} />
+                {!detailOpen && (
+                  <button
+                    type="button"
+                    className="plan-step-tag-add plan-step-hover-only"
+                    onClick={() => setAddingDetail(step.id)}
+                  >
+                    <IconPlus size={11} aria-hidden /> {t("plan.addDetail")}
+                  </button>
                 )}
                 <span className="plan-step-actions">
                   {editingId === step.id ? null : (
@@ -212,34 +221,18 @@ export function PlanStepsEditor({ draft, dispatch }: { draft: PlanDraft; dispatc
                   </TooltipButton>
                 </span>
               </div>
-              {!!step.dependsOn.length && (
-                <div className="plan-tab-chips" data-testid="plan-step-deps">
-                  <span className="plan-tab-muted">{t("plan.dependsOn")}</span>
-                  {step.dependsOn.map((id) => {
-                    const dependencyIndex = draft.steps.findIndex((item) => item.id === id);
-                    const dependency = draft.steps[dependencyIndex];
-                    return dependency ? (
-                      <Badge key={id}>{dependencyIndex + 1}. {dependency.title}</Badge>
-                    ) : null;
-                  })}
-                </div>
-              )}
-              <div className="plan-step-controls">
-                <StepDependsOnPicker step={step} steps={draft.steps} dispatch={dispatch} />
-                <Button size="sm" onClick={() => toggleDetail(step.id)}>
-                  {t(detailOpen ? "plan.hideDetail" : "plan.addDetail")}
-                </Button>
-              </div>
               {detailOpen && (
                 <Textarea
                   className="plan-step-detail-input"
-                  rows={3}
+                  rows={2}
+                  autoFocus={addingDetail === step.id}
                   defaultValue={step.detail ?? ""}
                   aria-label={t("plan.stepDetailLabel")}
                   placeholder={t("plan.stepDetailPlaceholder")}
-                  onBlur={(event) =>
-                    dispatch({ type: "stepUpdate", id: step.id, detail: event.currentTarget.value.trim() || undefined })
-                  }
+                  onBlur={(event) => {
+                    dispatch({ type: "stepUpdate", id: step.id, detail: event.currentTarget.value.trim() || undefined });
+                    setAddingDetail(null);
+                  }}
                 />
               )}
             </li>

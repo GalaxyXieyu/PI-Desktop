@@ -610,7 +610,6 @@ export const es = {
     stepTitleLabel: "Título de la tarea",
     untitledStep: "Tarea sin título",
     addDetail: "Añadir detalle",
-    hideDetail: "Ocultar detalle",
     stepDetailLabel: "Detalle de la tarea",
     stepDetailPlaceholder: "Detalle opcional de esta tarea",
     wouldCreateCycle: "Crearía un ciclo",

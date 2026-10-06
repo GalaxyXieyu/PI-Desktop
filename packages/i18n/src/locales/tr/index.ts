@@ -619,7 +619,6 @@ export const tr = {
     stepTitleLabel: "Görev başlığı",
     untitledStep: "Adsız görev",
     addDetail: "Ayrıntı ekle",
-    hideDetail: "Ayrıntıyı gizle",
     stepDetailLabel: "Görev ayrıntısı",
     stepDetailPlaceholder: "Bu görev için isteğe bağlı ayrıntı",
     wouldCreateCycle: "Döngü oluşturur",

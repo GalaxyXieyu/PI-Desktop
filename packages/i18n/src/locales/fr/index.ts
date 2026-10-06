@@ -610,7 +610,6 @@ export const fr = {
     stepTitleLabel: "Titre de la tâche",
     untitledStep: "Tâche sans titre",
     addDetail: "Ajouter un détail",
-    hideDetail: "Masquer le détail",
     stepDetailLabel: "Détail de la tâche",
     stepDetailPlaceholder: "Détail facultatif pour cette tâche",
     wouldCreateCycle: "Créerait un cycle",

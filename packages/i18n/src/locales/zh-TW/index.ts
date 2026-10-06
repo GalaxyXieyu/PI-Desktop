@@ -614,7 +614,6 @@ export const zhTW = {
     stepTitleLabel: "任務標題",
     untitledStep: "未命名任務",
     addDetail: "新增詳情",
-    hideDetail: "收起詳情",
     stepDetailLabel: "任務詳情",
     stepDetailPlaceholder: "此任務的選填詳情",
     wouldCreateCycle: "會形成循環相依",
