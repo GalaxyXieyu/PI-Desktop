@@ -577,6 +577,9 @@ export const ptBR = {
     superseded: "Substituído",
   },
   plan: {
+    revise: "Revisar plano",
+    revisePrompt:
+      "Revise o plano existente \"{{title}}\" ({{path}}) e envie uma nova versão. Alterações:\n",
     build: "Construir",
     dependencyGraph: "Grafo de dependências",
     newTask: "Nova",
@@ -661,6 +664,9 @@ export const ptBR = {
     graphDirectionVertical: "Vertical",
   },
   goal: {
+    revise: "Revisar meta",
+    revisePrompt:
+      "Revise a meta existente \"{{title}}\" ({{path}}) e envie uma nova versão. Alterações:\n",
     viewPlan: "Ver plano",
     reviewEditPlan: "Revisar e editar plano",
     planning: "Definindo objetivo",

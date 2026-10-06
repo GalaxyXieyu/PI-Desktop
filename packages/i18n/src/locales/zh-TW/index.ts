@@ -583,6 +583,9 @@ export const zhTW = {
     superseded: "已被新版本取代",
   },
   plan: {
+    revise: "修改計畫",
+    revisePrompt:
+      "請基於既有計畫《{{title}}》（{{path}}）修改後重新提交一版。修改重點：\n",
     build: "建置",
     dependencyGraph: "相依圖",
     newTask: "新增",
@@ -667,6 +670,9 @@ export const zhTW = {
     graphDirectionVertical: "縱向",
   },
   goal: {
+    revise: "修改目標",
+    revisePrompt:
+      "請基於既有目標《{{title}}》（{{path}}）修改後重新提交一版。修改重點：\n",
     viewPlan: "查看/編輯計畫",
     reviewEditPlan: "查看/編輯計畫",
     planning: "正在明確目標",

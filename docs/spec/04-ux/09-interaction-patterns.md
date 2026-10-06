@@ -979,6 +979,12 @@ Agent calls a permission-gated tool (including Plan/Goal Bash under Ask or Accep
    response renders a failed-closed state. A host restart interrupts pending,
    queued, and running work without replay; an already-approved interruption
    keeps the session in Agent.
+7. A settled proposal whose execution is not queued or running offers
+   **Revise plan** / **Revise goal** in its Plan tab while the session is
+   visible and idle with no pending approval. It switches the session back to
+   the contract mode when needed and seeds the composer with a request naming
+   the title and artifact path; sending it yields a new submission that
+   supersedes the settled one, which stays immutable (D648).
 
 The approval card is session-scoped. Background sessions may retain a pending
 approval or queued/running execution state in `plan_approvals`, but opening

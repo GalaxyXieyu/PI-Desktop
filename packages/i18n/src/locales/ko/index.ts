@@ -588,6 +588,9 @@ export const ko = {
     superseded: "새 버전으로 대체됨",
   },
   plan: {
+    revise: "계획 수정",
+    revisePrompt:
+      "기존 계획 \"{{title}}\"({{path}})을 수정해 새 버전으로 다시 제출해 주세요. 변경 사항:\n",
     build: "빌드",
     dependencyGraph: "의존성 그래프",
     newTask: "새 작업",
@@ -672,6 +675,9 @@ export const ko = {
     graphDirectionVertical: "세로",
   },
   goal: {
+    revise: "목표 수정",
+    revisePrompt:
+      "기존 목표 \"{{title}}\"({{path}})을 수정해 새 버전으로 다시 제출해 주세요. 변경 사항:\n",
     viewPlan: "계획 보기",
     reviewEditPlan: "계획 검토 및 편집",
     planning: "목표 정의 중",

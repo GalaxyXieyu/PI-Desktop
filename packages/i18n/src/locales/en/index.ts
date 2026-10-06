@@ -591,6 +591,9 @@ export const en = {
     superseded: "Superseded",
   },
   plan: {
+    revise: "Revise plan",
+    revisePrompt:
+      "Revise the existing plan \"{{title}}\" ({{path}}) and submit a new version. Changes:\n",
     build: "Build",
     dependencyGraph: "Dependency graph",
     newTask: "New",
@@ -675,6 +678,9 @@ export const en = {
     graphDirectionVertical: "Vertical",
   },
   goal: {
+    revise: "Revise goal",
+    revisePrompt:
+      "Revise the existing goal \"{{title}}\" ({{path}}) and submit a new version. Changes:\n",
     viewPlan: "View plan",
     reviewEditPlan: "Review & edit plan",
     planning: "Defining goal",

@@ -579,6 +579,9 @@ export const de = {
     superseded: "Ersetzt",
   },
   "plan": {
+    revise: "Plan überarbeiten",
+    revisePrompt:
+      "Überarbeite den bestehenden Plan „{{title}}“ ({{path}}) und reiche eine neue Version ein. Änderungen:\n",
     build: "Erstellen",
     dependencyGraph: "Abhängigkeitsgraph",
     newTask: "Neu",
@@ -663,6 +666,9 @@ export const de = {
     "graphDirectionVertical": "Vertikal",
   },
   "goal": {
+    revise: "Ziel überarbeiten",
+    revisePrompt:
+      "Überarbeite das bestehende Ziel „{{title}}“ ({{path}}) und reiche eine neue Version ein. Änderungen:\n",
     viewPlan: "Plan ansehen",
     reviewEditPlan: "Plan prüfen und bearbeiten",
     "planning": "Ziel definieren",

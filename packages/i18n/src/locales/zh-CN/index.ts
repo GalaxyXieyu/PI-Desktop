@@ -583,6 +583,9 @@ export const zhCN = {
     superseded: "已被新版本替代",
   },
   plan: {
+    revise: "修改计划",
+    revisePrompt:
+      "请基于已有计划《{{title}}》（{{path}}）修改后重新提交一版。修改要点：\n",
     build: "构建",
     dependencyGraph: "依赖图",
     newTask: "新建",
@@ -667,6 +670,9 @@ export const zhCN = {
     graphDirectionVertical: "纵向",
   },
   goal: {
+    revise: "修改目标",
+    revisePrompt:
+      "请基于已有目标《{{title}}》（{{path}}）修改后重新提交一版。修改要点：\n",
     viewPlan: "查看/编辑计划",
     reviewEditPlan: "查看/编辑计划",
     planning: "正在明确目标",

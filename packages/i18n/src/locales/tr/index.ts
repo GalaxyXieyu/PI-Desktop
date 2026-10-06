@@ -588,6 +588,9 @@ export const tr = {
     superseded: "Yeni sürümle değiştirildi",
   },
   plan: {
+    revise: "Planı düzenle",
+    revisePrompt:
+      "Mevcut \"{{title}}\" planını ({{path}}) düzenleyip yeni bir sürüm gönder. Değişiklikler:\n",
     build: "Oluştur",
     dependencyGraph: "Bağımlılık grafiği",
     newTask: "Yeni",
@@ -672,6 +675,9 @@ export const tr = {
     graphDirectionVertical: "Dikey",
   },
   goal: {
+    revise: "Hedefi düzenle",
+    revisePrompt:
+      "Mevcut \"{{title}}\" hedefini ({{path}}) düzenleyip yeni bir sürüm gönder. Değişiklikler:\n",
     viewPlan: "Planı görüntüle",
     reviewEditPlan: "Planı incele ve düzenle",
     planning: "Hedef tanımlanıyor",
