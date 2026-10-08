@@ -1,4 +1,4 @@
-# Interactive Plan metadata — host contract (protocol 12, schema 22)
+# Interactive Plan metadata — host contract (protocol 12, schema 23)
 
 This additive host contract preserves immutable Markdown artifacts. A submission
 without metadata has the same proposal/execution wire shape and artifact bytes
@@ -53,7 +53,7 @@ with their optional metadata. Submission audit adds only `stepCount` and
 
 ## Storage and execution projection
 
-Schema 22 adds nullable TEXT columns `steps_json`, `design_json`,
+Schema 23 adds nullable TEXT columns `steps_json`, `design_json`,
 `resolved_steps_json`, and `resolved_design_json` to `plan_approvals`.
 Submitted `[]` and `{}` are stored as NULL. Proposal serialization omits NULL
 fields (`steps`, `design`, `resolvedSteps`, `resolvedDesign`). Corrupt metadata
@@ -104,10 +104,12 @@ another new item. Explicit new IDs take precedence regardless of position;
 carry-over never assigns one ID twice. Changed or ambiguous content does not
 inherit identity. Existing Agent-mode and running-turn authorization is unchanged.
 
-Schema 22 also adds nullable `session_todo.step_id` with a 1–64 character length
+Schema 23 also adds nullable `session_todo.step_id` with a 1–64 character length
 constraint when non-NULL. Fresh databases include it; the backed-up,
-transactional v21→v22 migration probes columns before adding them and preserves
-existing rows. The v20→v21→v22 chain remains supported.
+transactional v22→v23 migration probes columns before adding them and preserves
+existing rows. The v20→v21→v22→v23 chain remains supported. The same transaction
+repairs the session-list index on early dev v22 databases that already contain
+plan metadata, retaining a v22 backup and all existing metadata.
 
 ## Renderer document review
 

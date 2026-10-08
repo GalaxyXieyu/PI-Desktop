@@ -178,7 +178,7 @@ PRAGMA trusted_schema = ON;       -- required by the FTS triggers (§4.8); the D
 PRAGMA auto_vacuum = INCREMENTAL; -- set at creation, before any table
 ```
 
-- 架构版本位于 `PRAGMA user_version` (v22 = `22`) 中。 v1 `meta`
+- 架构版本位于 `PRAGMA user_version` (v23 = `23`) 中。 v1 `meta`
   桌子不见了。
 - host-core 是**单一作者**；语句使用 `prepare_cached`；每个
   多行写入在一个事务中运行。
@@ -513,10 +513,10 @@ CREATE TABLE plan_approvals (
   execution_state          TEXT CHECK (execution_state IN (
     'queued', 'running', 'completed', 'interrupted'
   )),
-  steps_json               TEXT, -- normalized submitted Interactive Plan steps (schema v22)
-  design_json              TEXT, -- normalized submitted Interactive Plan design (schema v22)
-  resolved_steps_json      TEXT, -- normalized approval revision, explicit [] kept (schema v22)
-  resolved_design_json     TEXT  -- normalized approval revision, explicit {} kept (schema v22)
+  steps_json               TEXT, -- normalized submitted Interactive Plan steps (schema v23)
+  design_json              TEXT, -- normalized submitted Interactive Plan design (schema v23)
+  resolved_steps_json      TEXT, -- normalized approval revision, explicit [] kept (schema v23)
+  resolved_design_json     TEXT  -- normalized approval revision, explicit {} kept (schema v23)
 );
 CREATE INDEX idx_plan_approvals_session
   ON plan_approvals(session_id, created_at DESC);
@@ -538,7 +538,7 @@ Plan/Goal 又创建一个新的完整 snapshot/approval 行，并且永远不会
 较早的文件。哈希值和字节大小在批准之前对文件进行身份验证，但是
 审批UI可以简单地打开相对路径。
 
-架构 v22 为交互式 Plan 增加四个可空的元数据列（ADR interactive-plan-structured-revision）：
+架构 v23 为交互式 Plan 增加四个可空的元数据列（ADR interactive-plan-structured-revision）：
 `steps_json` / `design_json` 保存规范化提交的结构化步骤和 UI 设计，
 `resolved_steps_json` / `resolved_design_json` 保存规范化的审批修订 ——
 显式的 `[]` / `{}` 清空保持 JSON，省略的修订保持 NULL。主机
@@ -629,7 +629,7 @@ revision，包括清空。唯一的部分 `in_progress` 索引在数据库边界
 行内容在存储前会裁剪空白，限制为 500 个 Unicode 标量值且不得包含 NUL。
 TodoWrite 是唯一的执行期写入方；Plan 审批事务是第二个主机拥有的写入方，
 它为每个已批准步骤播种一行（ADR interactive-plan-structured-revision，修订 ADR 0312）。渲染器和 sidecar
-只能通过 host RPC 访问该状态。`step_id`（架构 v22）将一行链接到
+只能通过 host RPC 访问该状态。`step_id`（架构 v23）将一行链接到
 计划步骤 id，并在一次写入内唯一；省略其 `stepId` 的 TodoWrite 项
 只有在恰好一个先前行拥有相同内容且没有其他新项认领该 id 时才会继承它。
 
@@ -1177,7 +1177,7 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
   旧文件中的会话、提供程序和设置不会保留；
   存档仍保留以供手动恢复。所有 v7 之前的迁移代码
   （v1 `settings.sqlite` 导入，v2→v6 链）被删除。
-- 全新安装直接运行完整的 v22 DDL。
+- 全新安装直接运行完整的 v23 DDL。
 - **架构 v15 是增量的。** 它增加 `turn_queue` 表及其两个索引（D386 / ADR 0213），使 Host
   拥有的回合队列在重启后存活；不改动任何已有行，迁移前保留 `pi.sqlite.v14.bak`。
 - **架构 v16 是增量的。** 它增加会话协作 link 和投递表、生命周期索引，以及可为空的
@@ -1188,14 +1188,19 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
   —— 所有 v17 之前的行保持 NULL 归属。该步骤之前保留 `pi.sqlite.v16.bak` 副本。
   v15→v16 会话协作步骤现在写入 `16`（它自己的版本）而不是最新的架构常量，
   因此 v15 文件可以在一次启动中走完两个步骤。
-- **架构 v22 是增量的（ADR interactive-plan-structured-revision）。** 它增加四个可空的 `plan_approvals`
+- **架构 v22 更新会话列表索引。** 它将 `idx_sessions_updated` 替换为
+  `idx_sessions_updated_id(updated_at DESC, id DESC)`，不改变既有行或字段；
+  迁移前保留 v21 备份。
+- **架构 v23 是增量的（ADR interactive-plan-structured-revision）。** 它增加四个可空的 `plan_approvals`
   元数据列（`steps_json`、`design_json`、`resolved_steps_json`、
-  `resolved_design_json`）和可空的 `session_todo.step_id`。每个既有行
+  `resolved_design_json`）和可空的 `session_todo.step_id`。没有元数据的既有行
   保持 NULL 元数据且没有步骤身份，渲染效果与之前完全相同。迁移先写入
-  精确可读的 `pi.sqlite.v21.bak` 副本，在添加每一列之前探测
+  精确可读的 `pi.sqlite.v22.bak` 副本，在添加每一列之前探测
   `pragma_table_info`，使部分升级或仅版本降级的文件不会被改变两次，
-  并在一个事务内最后设置 `PRAGMA user_version = 22`；
-  v20→v21→v22 链仍然受支持。
+  并在一个事务内最后设置 `PRAGMA user_version = 23`；
+  v20→v21→v22→v23 链仍然受支持。同一事务幂等地删除旧索引并创建
+  `idx_sessions_updated_id`，修复已有 Plan 元数据但缺失上游索引的早期
+  dev v22 数据库，保留其既有元数据。
 - **架构 v7 首先到达 v8，然后使用受保护的路径。** v7→v8
   迁移之后是相同的受保护的 v8→v15 迁移；架构-v9 和
   schema-v10 数据库采用相同的受保护路径并接收精确的可读数据

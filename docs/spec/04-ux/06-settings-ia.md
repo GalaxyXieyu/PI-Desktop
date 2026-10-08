@@ -541,6 +541,31 @@ confirmation only: Ask and Accept edits prompt, while Auto may run a mutating
 Bash command without confirmation. The AI Defaults card must describe that both
 contract modes are intent boundaries, not strict read-only security profiles.
 
+### Jev classifier
+
+- Keep Jev out of the chat provider/model list: it is a TypeSafe structured
+  classifier, not a conversation model, and it owns no provider row.
+- Offer it from **Add service**, in its own Classifiers group, on the add path
+  only: changing an existing row's service never turns it into a classifier.
+  The tile carries the TypeSafe address the key is spent on.
+- Adding Jev is one action with two steps: check the key against TypeSafe, then
+  store it and turn the classifier on. Nothing is written when the check fails,
+  and closing the dialog while the check is still running cancels the whole
+  action, so an enabled Jev always has a key the Agent can spend and an
+  abandoned dialog never leaves a credential behind. The credential is a
+  TypeSafe API key; this integration has no OAuth path.
+- The model configuration page shows the Jev card only once Jev has been added:
+  an install without it has nothing there to configure, and adding stays in the
+  service chooser. The card carries the stored-key state, the Agent-mode switch
+  and the actions that replace or remove the key; removing the key takes the
+  switch down first, then the card. The key itself is entered only in the
+  service dialog, which is also where it is checked. It stays in Host secure
+  storage; the renderer only learns whether one exists.
+- Explain that `JevClassify` sends only the state and questions the Agent passes
+  to TypeSafe, and warn users not to include secrets or personal information.
+- The tool is on demand and unavailable in Plan and Goal modes. Removing the
+  key turns Jev off first, then deletes it.
+
 ### Agent capability destinations (Skills / MCP / Subagents)
 
 Skills, MCP servers, and user-owned Subagents remain three independent

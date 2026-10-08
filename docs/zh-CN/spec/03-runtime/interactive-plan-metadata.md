@@ -1,4 +1,4 @@
-# 交互式 Plan 元数据 — 主机契约（协议 12，架构 22）
+# 交互式 Plan 元数据 — 主机契约（协议 12，架构 23）
 
 > **翻译说明：** 本页是与 [英文源规格](/spec/03-runtime/interactive-plan-metadata) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
 
@@ -50,7 +50,7 @@ Design 只接受 `framework`、`componentLibrary`、`styleKeywords`、
 
 ## 存储与执行投影
 
-架构 22 为 `plan_approvals` 增加可空 TEXT 列 `steps_json`、`design_json`、
+架构 23 为 `plan_approvals` 增加可空 TEXT 列 `steps_json`、`design_json`、
 `resolved_steps_json` 和 `resolved_design_json`。提交的 `[]` 和 `{}`
 存为 NULL。proposal 序列化省略 NULL 字段（`steps`、`design`、
 `resolvedSteps`、`resolvedDesign`）。损坏的元数据在读取时被省略并给出
@@ -97,9 +97,10 @@ Todo 项接受可选的 `stepId`：修剪后的字符串，使用与计划步骤
 两次。变化或有歧义的内容不继承身份。既有的 Agent 模式与运行中 turn 的
 授权保持不变。
 
-架构 22 还增加可空的 `session_todo.step_id`，非 NULL 时受 1–64 字符的
-长度约束。全新数据库直接包含它；带备份的、事务性的 v21→v22 迁移在添加
-之前探测列并保留既有行。v20→v21→v22 链仍然受支持。
+架构 23 还增加可空的 `session_todo.step_id`，非 NULL 时受 1–64 字符的
+长度约束。全新数据库直接包含它；带备份的、事务性的 v22→v23 迁移在添加
+之前探测列并保留既有行。v20→v21→v22→v23 链仍然受支持。
+同一事务还会修复早期 dev v22 数据库中缺失的会话列表索引，保留 v22 备份和既有元数据。
 
 ## 渲染器文档审阅
 

@@ -596,8 +596,9 @@ levels does not waive the relevant E2E gate.
 
 ### E2E-PLAN-METADATA: Interactive Plan host metadata acceptance
 
-- **Preconditions**: Protocol 12 host, isolated workspace and schema 22 database;
-  an existing schema 21 fixture with approval and checklist rows for upgrade.
+- **Preconditions**: Protocol 12 host, isolated workspace and schema 23 database;
+  existing schema 21 and upstream/dev schema 22 fixtures with approval and
+  checklist rows for upgrade.
 - **Steps**: Submit a Plan with steps and design; reload pending; approve or
   reject and fetch it through `plans.get`. Fetch using another session. Submit
   cyclic steps, invalid colors, Goal metadata, and omitted/empty metadata.
@@ -605,7 +606,8 @@ levels does not waive the relevant E2E gate.
 - **Expected**: Normalized metadata persists and reads back; session mismatch is
   `PLAN_NOT_FOUND`; invalid metadata creates neither file nor row; omitted/empty
   metadata leaves legacy wire shape and exact artifact bytes unchanged. Upgrade
-  preserves rows with NULL metadata and is idempotent.
+  preserves rows with NULL or existing metadata, installs the session-list index,
+  reaches schema 23, and is idempotent.
 - **Specs linked**: `03-runtime/interactive-plan-metadata.md`
 - **Acceptance criterion**: Host-owned persistence and protocol correctness.
 - **Milestone**: Interactive Plan.
@@ -5379,11 +5381,12 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Preconditions**: A clean worktree at the current stable version. No release
   tag has been created for the candidate version.
 - **Steps**: 1) Run `node scripts/check-release-docs.mjs` on the aligned tree.
-  2) Regress one surface at a time — remove the newest changelog entry from
-  `en`, then from `zh-CN`, then change a highlight count so the locales differ,
-  then set `docs/package.json` to an older version, then leave the READMEs
-  stating the previous `<major>.<minor>.x` release line — and rerun the
-  preflight after each. 3) Run `node scripts/release.mjs <next-version> --tag`
+  2) Regress one surface at a time — replace the models.dev catalog with an
+  empty object, remove the newest changelog entry from `en`, then from `zh-CN`,
+  change a highlight count so the locales differ, set `docs/package.json` to
+  an older version, and leave the READMEs stating the previous
+  `<major>.<minor>.x` release line — then rerun the preflight after each. 3) Run
+  `node scripts/release.mjs <next-version> --tag`
   with one surface still regressed. 4) Restore every surface, rerun the
   preflight, and repeat the release command.
 - **Expected**: The aligned tree reports alignment and exits 0. Each regression
@@ -8106,6 +8109,11 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
     text-plus-image send to verify full draft restoration. In a narrow pane,
     prefill 20 images, confirm 20 inline chips inside the composer, and remove
     one without losing the others.
+    Send a prompt that puts text, an image, then more text in that order:
+    confirm the sent message renders the image chip at that position instead of
+    after the body, and that an image the draft did not name inline still
+    follows the text. The provider-facing prompt keeps the same order; the
+    runtime placement tests assert those content blocks.
     Inspect the chip and open it with click, Enter, and
      Space. Confirm a centered modal preview opens, the work panel stays
      unchanged, and the draft is neither edited nor sent. Check small images
@@ -8156,7 +8164,12 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   F (persistence), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`composer-paste-files.test.mjs`,
-  `composer-clipboard.test.mjs`, `composer-native-deletion.test.mjs`); `pnpm test:e2e:composer-paste` mounts the real
+  `composer-clipboard.test.mjs`, `composer-native-deletion.test.mjs`);
+  `prompt-inline-attachments.test.mjs` covers where an inline image's `@path`
+  is recorded and that a replayed fallback copy still travels,
+  `session-message-presentation.test.mjs` renders the row order, and
+  `packages/agent-runtime/src/runtime.test.ts` asserts the prompt content
+  blocks. `pnpm test:e2e:composer-paste` mounts the real
   ComposerInput, draft/paste hooks, file viewer, production CSS and sandboxed
   preload. It dispatches Chromium ClipboardEvents with synthetic mixed data
   and native File objects, exercises the real scratch writer and contained
@@ -17023,12 +17036,64 @@ host-created files. The full app's file-preview viewer is covered separately.
   Send in an older chat: accepted submission updates new-chat inheritance;
   rejected submission does not. Deferred configuration alone does not count
   as usage.
+
+- **Preconditions:** Isolated Electron profile, fake Host IPC/secret storage,
+  and a `globalThis.fetch` fixture for `https://api.typesafe.ai/v1/systemone`.
+  Build workspace JS packages with `pnpm build:js`, then run
+  `pnpm test:e2e:jev`. Do not use a real TypeSafe key or endpoint.
+- **Steps:** 1) On the service chooser's add path, confirm Jev is offered in
+  its own Classifiers group and absent when an existing row changes service,
+  and that no Jev card is on the model configuration page yet. 2) Open the Jev
+  form, paste a sentinel key and Check and save: the fixture answers the check,
+  the key reaches Host secure storage, Jev is on, and the card appears.
+  3) Resolve a session launch with Jev enabled, then disabled and in Plan mode.
+  4) Through the runtime's deferred catalog, request Jev in Agent mode and
+  inspect Plan/Goal catalogs. 5) Call `JevClassify` with one choice, one score
+  and one boolean question over a small JSON state. 6) Answer a check with 401
+  for a second key: nothing is written and Jev stays off. 7) Start a check and
+  close the dialog while it is still in flight: the key is not stored and Jev
+  stays off. 8) In the Jev card, switch Jev off and remove the key; the card
+  leaves with it.
+- **Expected:** The check runs before any write, in the order check, store, then
+  enable, so a refused key leaves no secret and no enabled setting behind, and
+  the refusal is reported with TypeSafe's status. The card is on the page only
+  once Jev has been added, and it leaves when the key does. The UI never returns
+  the key to settings state, and removal disables Jev before deleting it. Only
+  an enabled Agent launch reads the key and passes it ephemerally to the sidecar.
+  `JevClassify` appears in the Agent's deferred catalog only with a key and
+  never in Plan or Goal. Closing the dialog cancels an in-flight check the same
+  way a refused key does: nothing stored, nothing enabled. The fixture receives
+  the TypeSafe System One payload and bearer header; the tool returns bounded
+  structured answers and usage.
+- **Specs:** [Tools and permissions](../03-runtime/03-tools-and-permissions.md),
+  [provider/model system](../03-runtime/11-provider-model-system.md),
+  [secrets storage](../03-runtime/14-secrets-storage.md),
+  [settings IA](../04-ux/06-settings-ia.md).
+- **Acceptance:** No paid or real-provider call. The suite verifies the UI user
+  path, the ordered check-then-store gate, the refused-key path, the fixed
+  secret reference, opt-in Agent launch boundary, deferred mode catalog,
+  request body, bearer auth, usage, error redaction, cancellation, timeout,
+  malformed and oversized input rejection, and key removal.
 - Disable/remove a provider or model and mark a model for image generation:
   unavailable history entries are skipped for inheritance and recent menu rows.
 - Settings contains no fixed chat-default picker or Make default service action;
   image model selection and provider configuration remain available.
 - Coverage: recent-models.test.mjs, recent-model-flow.test.mjs,
   default-model-picker.test.mjs, and scripts/e2e-composer-model-selection.mjs.
+
+## Schema v22 collision recovery
+
+- Open an isolated upstream v22 database with the session-list index but no
+  plan metadata columns: startup adds the columns and stamps v23.
+- Open an isolated early dev v22 database with plan metadata and the old
+  `idx_sessions_updated`: startup preserves metadata and checklist step IDs,
+  replaces the index with `idx_sessions_updated_id(updated_at DESC, id DESC)`,
+  and stamps v23. Both paths retain a readable `pi.sqlite.v22.bak`.
+- Reopen and rerun the migration: no duplicate columns, data changes, or index
+  errors. A v21 database still traverses upstream v22 before v23.
+- Automated filesystem/database coverage: `db::migration_v23::tests` and
+  `db::tests::migrates_v21_to_current_replaces_session_index` in
+  `cargo test -p host-core`.
 
 ## Interactive Plan host scenarios
 
@@ -17079,3 +17144,42 @@ progress rendering after approval.
 | Case ID | Steps and expected result |
 | --- | --- |
 | `E2E-PLAN-interactive-tab-edit-build-progress` | Seed a Plan session and submit a proposal with four steps (s3 depends on s1+s2, s4 on s3) and a design spec through the probe's `submit` op with `steps`/`design`; the probe echo carries the host-normalized steps/design. Reload, select the session, and open the Plan tab via the approval bar. Through real DOM events: rename s2, delete s4, add a step, and set its dependency on s3; open s1's dependency picker and confirm the s3 option is disabled with "Would create a cycle"; edit the design (remove a keyword, add one, change a primary color, font family, and component library). The draft graph shows 4 nodes, 3 edited edges, and a dep chip naming s3. Click tab `Build` with the Ask default: the session enters Agent mode, `plans.get` returns `resolvedSteps`/`resolvedDesign` equal to the edited revision, and `todos.get` seeds one pending item per step in order with `stepId`. Push TodoWrite progress on the still-running submit turn through the probe `todo` op, settle the turn, and confirm `plan-progress` shows "1 / 4 done", step rows and graph nodes carry `data-status` (s1 completed, s3 in progress, others pending), and the tab no longer renders editable controls. The post-approval launch failure may surface only the expected provider-not-configured diagnostic. Screenshots: `plan-tab-opened`, `plan-steps-edited`, `plan-design-edited`, `plan-graph-draft`, `plan-progress`, `plan-graph-progress`. |
+
+## BOM-marked UTF-16 text tools
+
+- Create a UTF-16LE PowerShell build log with a BOM and CRLF, then ask the agent
+  to Read it. The tool and the next model request contain readable log lines.
+- Edit a displayed line. The original BOM, endian and CRLF bytes are preserved.
+- Repeat with UTF-16BE Chinese text. Ordinary binary files remain rejected.
+- Automated coverage: `read_powershell_utf16le_log`,
+  `read_and_edit_utf16be_chinese_text`, and the existing binary/CRLF tool tests.
+
+
+## Delegate mutation recovery isolation
+
+- Start two Task delegates editing the same file. Delegate A produces text and
+  fails three Edits; B fails twice and then completes. A is failed with
+  `MUTATION_RETRY_BUDGET_EXHAUSTED`, B completes, and the parent has no mutation
+  error. Resume A with a corrected task and verify successful completion.
+- Run the same flow with failing shell patch commands. Repeat with one delegate
+  to prove that text preceding exhaustion does not become a completed report.
+- While a delegate continues, a new parent prompt resets only the parent's
+  recovery counters. Both default and explicit delegate permissions retain the
+  same isolation.
+- Automated provider-boundary flow: `node scripts/e2e-subagent-edit-isolation.mjs`
+  with optional `--single` and `--patch`; runtime tests cover parent restart.
+
+
+## Regenerate archival during quit
+
+- Regenerate a completed answer and quit as soon as the terminal event arrives.
+  Restart the isolated profile: both revisions and their final messages remain
+  readable, and no `host-core disposed` archival failure appears in the logs.
+- Hold the archive RPC while requesting quit. Host disposal waits for successful
+  archival; storage errors are logged. An unresponsive archive warns and allows
+  quit after the existing two-second bounded wait.
+- Automated coverage: `shutdown-regenerate-persistence.test.mjs` and
+  `node scripts/e2e-regenerate-quit.mjs` (built Desktop, sidecar and host required;
+  Playwright can be supplied through `PI_TEST_PLAYWRIGHT`). Only the model server
+  is simulated in the Electron flow. The fixture profile and screenshots stay
+  under `.artifacts/` for inspection; no user profile or paid model is used.

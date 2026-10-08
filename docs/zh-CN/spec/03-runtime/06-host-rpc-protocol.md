@@ -157,7 +157,7 @@ type HandshakeResult = {
 10. 版本 12 增加交互式 Plan 元数据和审批修订。v11 对端会被拒绝，而不是
     静默丢弃已批准的结构。
 
-协议 v12 增加交互式 Plan 存储架构 v22（继 v21 之后）。更早的架构历史：
+协议 v12 增加交互式 Plan 存储架构 v23（继 v22 会话列表索引之后）。更早的架构历史：
 架构 v12 曾通过 `migrate_v11_to_v12` 增加 A2A 表（`a2a_tasks`、`a2a_messages`、
 `a2a_artifacts`、`a2a_push_configs`）；`migrate_v12_to_v13` 删除这些表，
 v14 增加插件会话来源 sidecar 和软删除字段；架构版本是内部持久性不变量，

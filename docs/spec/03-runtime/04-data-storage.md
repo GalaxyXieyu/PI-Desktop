@@ -316,7 +316,7 @@ PRAGMA trusted_schema = ON;       -- required by the FTS triggers (§4.8); the D
 PRAGMA auto_vacuum = INCREMENTAL; -- set at creation, before any table
 ```
 
-- Schema version lives in `PRAGMA user_version` (v22 = `22`). The v1 `meta`
+- Schema version lives in `PRAGMA user_version` (v23 = `23`). The v1 `meta`
   table is gone.
 - host-core is the **single writer**; statements use `prepare_cached`; every
   multi-row write runs in one transaction.
@@ -692,10 +692,10 @@ CREATE TABLE plan_approvals (
   execution_state          TEXT CHECK (execution_state IN (
     'queued', 'running', 'completed', 'interrupted'
   )),
-  steps_json               TEXT, -- normalized submitted Interactive Plan steps (schema v22)
-  design_json              TEXT, -- normalized submitted Interactive Plan design (schema v22)
-  resolved_steps_json      TEXT, -- normalized approval revision, explicit [] kept (schema v22)
-  resolved_design_json     TEXT  -- normalized approval revision, explicit {} kept (schema v22)
+  steps_json               TEXT, -- normalized submitted Interactive Plan steps (schema v23)
+  design_json              TEXT, -- normalized submitted Interactive Plan design (schema v23)
+  resolved_steps_json      TEXT, -- normalized approval revision, explicit [] kept (schema v23)
+  resolved_design_json     TEXT  -- normalized approval revision, explicit {} kept (schema v23)
 );
 CREATE INDEX idx_plan_approvals_session
   ON plan_approvals(session_id, created_at DESC);
@@ -717,7 +717,7 @@ Plan/Goal turn creates a new complete snapshot/approval row and never replaces a
 earlier file. Hash and byte size authenticate the file before approval, but the
 approval UI may simply open the relative path.
 
-Schema v22 adds four nullable metadata columns for the Interactive Plan
+Schema v23 adds four nullable metadata columns for the Interactive Plan
 (ADR interactive-plan-structured-revision): `steps_json` / `design_json` hold the normalized submitted
 structured steps and UI design, and `resolved_steps_json` /
 `resolved_design_json` hold the normalized approval revision — an explicit
@@ -827,7 +827,7 @@ The row content is bounded at 500 Unicode scalar values, contains no NUL, and
 is trimmed before storage. TodoWrite is the only execution-time writer; the
 Plan approval transaction is a second host-owned writer that seeds one row
 per approved step (ADR interactive-plan-structured-revision, amending ADR 0312). Renderer and sidecar code
-access this state through host RPC. `step_id` (schema v22) links a row to a
+access this state through host RPC. `step_id` (schema v23) links a row to a
 plan step id and is unique within one write; a TodoWrite item that omits its
 `stepId` inherits it only when exactly one previous row had identical content
 and no other new item claims that id.
@@ -1460,7 +1460,7 @@ truncating at a guessed position.
     cross the host/Electron/renderer boundary
   - full transcript consumers → one sequential read of
     `sessions/<id>.jsonl` (no DB), retained for sidecar context and mutations
-  - session list → `idx_sessions_updated`
+  - session list → `idx_sessions_updated_id(updated_at DESC, id DESC)`
   - group-by-project → `idx_sessions_project`
   - badges/cost rollup → `idx_turns_session` (latest turn per session)
   - global token history → `idx_turns_ended_at` (completed turns by end time)
@@ -1486,7 +1486,7 @@ truncating at a guessed position.
   Sessions, providers, and settings from the old file are not carried over;
   the archive remains for manual recovery. All pre-v7 migration code
   (v1 `settings.sqlite` import, v2→v6 chain) is deleted.
-- Fresh installs run the full v22 DDL directly.
+- Fresh installs run the full v23 DDL directly.
 - **Schema v7 first reaches v8, then uses the guarded path.** The v7→v8
   migration is followed by the same guarded v8→v15 migration; schema-v9 and
   schema-v10 databases take the same guarded path and receive an exact readable
@@ -1544,15 +1544,21 @@ truncating at a guessed position.
   and `turn_queue.voice_origin_json`; existing queue rows remain valid and
   unset. The migration keeps a v19 backup, and queue entries remain held until
   the existing Agent Host controller attaches.
-- **Schema v22 is additive (ADR interactive-plan-structured-revision).** It adds the four nullable
+- **Schema v22 is additive.** It replaces `idx_sessions_updated` with
+  `idx_sessions_updated_id(updated_at DESC, id DESC)` for session-list ordering.
+  It changes no rows or persisted fields; a v21 backup precedes the migration.
+- **Schema v23 is additive (ADR interactive-plan-structured-revision).** It adds the four nullable
   `plan_approvals` metadata columns (`steps_json`, `design_json`,
   `resolved_steps_json`, `resolved_design_json`) and nullable
-  `session_todo.step_id`. Each existing row keeps NULL metadata and no step
-  identity, and renders exactly as before. The migration writes an exact
-  readable `pi.sqlite.v21.bak` copy first, probes `pragma_table_info` before
+  `session_todo.step_id`. Existing rows without metadata keep NULL metadata and
+  no step identity, and render exactly as before. The migration writes an exact
+  readable `pi.sqlite.v22.bak` copy first, probes `pragma_table_info` before
   adding each column so a partially upgraded or version-only-downgraded file
-  is not altered twice, and sets `PRAGMA user_version = 22` last inside one
-  transaction; the v20→v21→v22 chain remains supported.
+  is not altered twice, and sets `PRAGMA user_version = 23` last inside one
+  transaction; the v20→v21→v22→v23 chain remains supported. It also idempotently
+  drops `idx_sessions_updated` and creates `idx_sessions_updated_id`, repairing
+  early dev databases stamped v22 that already have plan metadata columns but
+  lack the upstream session-list index. Existing metadata is preserved.
 - **Schema v14 is additive.** It adds nullable `sessions.deleted_at`, the
   partial deletion index, and `session_import_origins`. Existing sessions stay
   active and have no origin rows. The migration runs in the same guarded
