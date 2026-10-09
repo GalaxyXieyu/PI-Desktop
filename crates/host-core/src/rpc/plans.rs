@@ -221,6 +221,8 @@ pub(super) async fn handle(
                             target_permission_mode: target,
                             revised_steps: params.get("revisedSteps"),
                             revised_design: params.get("revisedDesign"),
+                            revised_markdown: params.get("revisedMarkdown"),
+                            target_model: params.get("targetModel"),
                         },
                     )
                     .map_err(plan_rpc_err)?;

@@ -673,7 +673,7 @@
   z-index: 25;
   width: max-content;
   min-width: 150px;
-  max-width: min(220px, calc(100vw - 32px));
+  max-width: min(260px, calc(100vw - 32px));
   padding: 4px;
   border: 1px solid var(--ds-border-default);
   border-radius: var(--radius-sm);
@@ -714,4 +714,27 @@
 .plan-approval-menu-item svg {
   flex: 0 0 auto;
   margin-left: auto;
+}
+
+.plan-approval-menu-item small {
+  display: block;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
+}
+
+.plan-approval-menu-separator {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--ds-border-default);
+}
+
+.plan-approval-menu-heading {
+  padding: 4px 8px 2px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
+}
+
+.plan-approval-menu-models {
+  max-height: 240px;
+  overflow-y: auto;
 }

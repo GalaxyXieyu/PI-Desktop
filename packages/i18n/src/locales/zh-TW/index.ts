@@ -585,8 +585,6 @@ export const zhTW = {
   },
   plan: {
     revise: "修改計畫",
-    revisePrompt:
-      "請基於既有計畫《{{title}}》（{{path}}）修改後重新提交一版。修改重點：\n",
     build: "建置",
     dependencyGraph: "相依圖",
     newTask: "新增",
@@ -595,6 +593,11 @@ export const zhTW = {
     viewPlan: "查看/編輯計畫",
     reviewEditPlan: "查看/編輯計畫",
     document: "計畫",
+    documentEditor: "編輯計畫正文",
+    editTasks: "編輯任務",
+    reviseEditedPrompt: "我修改了計畫《{{title}}》（{{path}}），請以下面修改後的內容為準重新提交一版計畫，未改動的部分保持不變。",
+    executionModel: "執行模型",
+    executionModelSession: "沿用工作階段模型 · {{model}}",
     goalKind: "目標",
     designSpec: "設計規範",
     taskCount: "{{count}} 個任務",
@@ -671,9 +674,6 @@ export const zhTW = {
     graphDirectionVertical: "縱向",
   },
   goal: {
-    revise: "修改目標",
-    revisePrompt:
-      "請基於既有目標《{{title}}》（{{path}}）修改後重新提交一版。修改重點：\n",
     viewPlan: "查看/編輯計畫",
     reviewEditPlan: "查看/編輯計畫",
     planning: "正在明確目標",

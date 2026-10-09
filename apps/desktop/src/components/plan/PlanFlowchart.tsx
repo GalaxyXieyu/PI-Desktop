@@ -19,6 +19,7 @@ export function PlanTasksSection({
   steps,
   progress,
   summary,
+  actions,
   children,
 }: {
   /** Steps the graph mode renders — the live draft while pending. */
@@ -26,6 +27,8 @@ export function PlanTasksSection({
   progress?: PlanProgress;
   /** Content shared by both modes, such as approved execution progress. */
   summary?: ReactNode;
+  /** Header controls placed before the view toggle. */
+  actions?: ReactNode;
   /** List-mode content. */
   children: ReactNode;
 }) {
@@ -35,6 +38,7 @@ export function PlanTasksSection({
     <section className="plan-tab-section" aria-label={t("plan.tasks")}>
       <div className="plan-tab-section-head">
         <h2>{t("plan.tasks")}</h2>
+        {actions}
         {!!steps.length && <div data-testid="plan-view-toggle">
           <SegmentedControl
             value={view}

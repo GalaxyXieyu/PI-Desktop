@@ -10,8 +10,8 @@ import {
 import { usePlanDraft } from "../../features/plan/plan-draft-store";
 import { usePlanProposal } from "../../features/plan/use-plan-proposal";
 import { usePlanRevise } from "../../features/plan/use-plan-revise";
-import { Badge, Button } from "../ui";
-import { IconPencil } from "../icons";
+import { Badge, Button, TooltipButton } from "../ui";
+import { IconPencil, IconUndo2 } from "../icons";
 import { PlanDocument } from "../plan/PlanDocument";
 import { PlanBuildControls } from "../plan/PlanBuildControls";
 
@@ -29,12 +29,12 @@ function PlanTabContent({ proposal, remote }: { proposal: PlanProposal; remote: 
   const [draft, dispatch] = usePlanDraft(proposal);
   const pluginViews = useAppStore((state) => state.pluginViews);
   const openTab = useAppStore((state) => state.openWorkPanelTabForSession);
-  const revise = usePlanRevise(proposal, remote);
+  const revise = usePlanRevise(proposal, draft, remote);
   const path = proposal.artifact?.relativePath?.trim();
   const pending = proposal.status === "pending";
   const isPlan = proposal.kind === "plan";
   // Structure editing is local-only: remote sessions never send a revision.
-  const editable = pending && isPlan && !remote;
+  const editable = isPlan && !remote;
   const dirty = editable && planDraftDirty(draft);
   const status = proposal.status === "approved"
     ? proposal.executionState === "running" ? "executing"
@@ -43,29 +43,32 @@ function PlanTabContent({ proposal, remote }: { proposal: PlanProposal; remote: 
     : proposal.status;
   return <div className="plan-tab" data-testid="plan-tab">
     <header className="plan-tab-header">
-      <Badge>{t(proposal.kind === "goal" ? "plan.goalKind" : "plan.document")}</Badge>
-      <Badge tone={pending ? "warning" : "neutral"}>{t(`plan.status.${status}`)}</Badge>
-      {dirty && <Badge tone="warning">{t("plan.modified")}</Badge>}
-      <strong className="plan-tab-title">{proposal.title}</strong>
-      {dirty && <Button size="sm" onClick={() => dispatch({ type: "reset" })}>{t("plan.resetChanges")}</Button>}
-      {path && <Button size="sm" title={path} aria-label={t(`${proposal.kind}.openArtifactLabel`, { path })}
-        onClick={() => openTab(proposal.sessionId, preferredFileWorkPanelTab(path, pluginViews))}>
-        {path}
-      </Button>}
-      {pending && isPlan && <div className="plan-tab-actions">
-        <PlanBuildControls
+      <div className="plan-tab-heading">
+        <Badge>{t(proposal.kind === "goal" ? "plan.goalKind" : "plan.document")}</Badge>
+        <Badge tone={pending ? "warning" : "neutral"}>{t(`plan.status.${status}`)}</Badge>
+        {dirty && <Badge tone="warning">{t("plan.modified")}</Badge>}
+        <strong className="plan-tab-title" title={proposal.title}>{proposal.title}</strong>
+        {path && <Button size="sm" className="plan-tab-path" title={path} aria-label={t(`${proposal.kind}.openArtifactLabel`, { path })}
+          onClick={() => openTab(proposal.sessionId, preferredFileWorkPanelTab(path, pluginViews))}>
+          <span>{path}</span>
+        </Button>}
+      </div>
+      <div className="plan-tab-actions">
+        {dirty && <TooltipButton type="button" className="icon-btn icon-btn-square" ariaLabel={t("plan.resetChanges")}
+          tooltip={t("plan.resetChanges")} onClick={() => dispatch({ type: "reset" })}>
+          <IconUndo2 size={14} aria-hidden />
+        </TooltipButton>}
+        {pending && isPlan && <PlanBuildControls
           proposal={proposal}
           revision={remote ? undefined : planDraftRevision(draft)}
           disabledReason={remote ? undefined : planDraftValidation(draft)?.message}
           variant="tab"
-        />
-      </div>}
-      {pending && !isPlan && !remote && <div className="plan-tab-actions" />}
-      {revise.available && <div className="plan-tab-actions">
-        <Button size="sm" variant="primary" data-testid="plan-revise" onClick={() => void revise.revise()}>
-          <IconPencil size={13} aria-hidden /> {t(`${proposal.kind}.revise`)}
-        </Button>
-      </div>}
+        />}
+        {revise.available && <Button size="sm" variant="primary" data-testid="plan-revise"
+          disabled={revise.sending} onClick={() => void revise.revise()}>
+          <IconPencil size={13} aria-hidden /> {t("plan.revise")}
+        </Button>}
+      </div>
     </header>
     {remote && <p className="plan-tab-message">{t("plan.remoteReadOnly")}</p>}
     {remote && pending && isPlan && <p className="plan-tab-message">{t("plan.remoteNoEditing")}</p>}

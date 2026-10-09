@@ -7335,6 +7335,8 @@ mod tests {
                         target_permission_mode: Some("ask"),
                         revised_steps: None,
                         revised_design: None,
+                        revised_markdown: None,
+                        target_model: None,
                     },
                 )
                 .unwrap();

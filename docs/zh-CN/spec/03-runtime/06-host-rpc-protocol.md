@@ -406,6 +406,12 @@ Proposal 记录增加可选的提交 `steps`/`design` 和可选的
 无写入地成功（省略等同于 NULL，而不是显式清空）；任何不匹配都
 以 `PLAN_APPROVAL_CONFLICT` 失败。执行描述符只公开有效的非空
 元数据。旧有 proposal 省略全部四个字段。
+Plan 的批准还接受 `revisedMarkdown: string`；主机把它发布为新工件，
+已批准行的 `markdown` / `artifact` 描述该文件（ADR
+plan-body-approval-revision）。批准（Plan 或 Goal）还接受
+`targetModel: { providerId, modelId }`；审批事务在设置模式与权限的同时设置
+会话的 provider 与模型。reject 携带它，或 id 非字符串/空白，以
+`PLAN_INVALID_ARGUMENT` 失败。重放不比较该字段。
 
 共享校验器返回 `{ ok: true, value }` 或
 `{ ok: false, code, path, message }`，其中 message 为

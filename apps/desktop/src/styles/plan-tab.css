@@ -10,7 +10,6 @@
   top: 0;
   z-index: 1;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
@@ -18,17 +17,49 @@
   border-bottom: 1px solid var(--ds-border-default);
 }
 
-.plan-tab-header .btn {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  white-space: normal;
+.plan-tab-heading {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.plan-tab-heading > * {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .plan-tab-title {
-  flex: 1 1 120px;
-  overflow-wrap: anywhere;
+  flex: 0 1 auto;
+  min-width: 32px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: var(--text-md);
   font-weight: var(--font-weight-semibold);
+}
+
+.plan-tab-heading > .plan-tab-path {
+  flex: 0 1 auto;
+  min-width: 32px;
+  padding-inline: 8px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
+}
+
+.plan-tab-path > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The document repeats the title as its heading; narrow headers keep the actions. */
+@container (max-width: 420px) {
+  .plan-tab-heading > .badge:first-child,
+  .plan-tab-title {
+    display: none;
+  }
 }
 
 .plan-document {
@@ -65,10 +96,54 @@
   margin-top: 16px;
 }
 
-/* The immutable plan body reads like chat prose; long paths wrap at word
+/* The plan body reads like chat prose; long paths wrap at word
    boundaries so tables keep usable column widths. */
 .plan-markdown {
   overflow-wrap: break-word;
+}
+
+/* The pending body edits in place: the editor keeps the prose look and only
+   shows a frame on hover or focus. */
+.plan-markdown-editor {
+  margin: 0 -10px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md-plus);
+  outline: none;
+  cursor: text;
+  transition: border-color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.plan-markdown-editor:hover {
+  border-color: var(--ds-border-default);
+}
+
+.plan-markdown-editor:focus-within {
+  border-color: var(--ds-border-strong);
+}
+
+.plan-markdown-editor .tableWrapper {
+  margin: 0.9em 0;
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-md-plus);
+}
+
+.plan-markdown-editor table {
+  margin: 0;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+}
+
+.plan-markdown-editor th > p,
+.plan-markdown-editor td > p {
+  margin: 0;
+}
+
+.plan-markdown-editor .selectedCell {
+  background: var(--ds-tile-hover);
 }
 
 .plan-tab-section h2:not(.prose-chat *) {
@@ -574,11 +649,25 @@
 
 .plan-tab-actions {
   display: flex;
+  flex-shrink: 0;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
   margin-left: auto;
+}
+
+.plan-tab-actions .plan-approval-split {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.plan-tab-actions .plan-approval-approve-main {
+  padding-inline: 14px;
+}
+
+.plan-tab-actions:empty {
+  display: none;
 }
 
 .plan-build-error {
@@ -627,6 +716,7 @@
 }
 
 .plan-tab-section-head h2 {
+  flex: 1 1 auto;
   margin-bottom: 0;
   border-bottom: none;
 }

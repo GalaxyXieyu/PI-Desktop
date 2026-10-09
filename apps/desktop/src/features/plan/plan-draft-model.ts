@@ -11,6 +11,7 @@ import {
   type PlanProposal,
   type PlanResolveRequest,
   type PlanStep,
+  type PlanTargetModel,
 } from "@pi-desktop/shared";
 
 export type PlanDraft = {
@@ -19,7 +20,11 @@ export type PlanDraft = {
   baseDesign?: PlanDesignSpec;
   steps: PlanStep[];
   design?: PlanDesignSpec;
+  baseMarkdown: string;
+  markdown: string;
   editingStepId?: string;
+  /** A settled plan's task list shows execution progress until this is set. */
+  tasksEditing?: boolean;
 };
 
 type FontLevel = "heading" | "subheading" | "body";
@@ -38,26 +43,50 @@ export type PlanDraftAction =
   | { type: "designRemoveColor"; group: PlanColorGroup; index: number }
   | { type: "designSetFramework"; value: string | undefined }
   | { type: "designSetComponentLibrary"; value: string | undefined }
+  | { type: "markdownSet"; value: string }
+  | { type: "tasksEdit" }
   | { type: "reset" };
 
-export function planDraftKey(proposal: Pick<PlanProposal, "sessionId" | "id" | "version">): string {
-  return `${proposal.sessionId}:${proposal.id}:${proposal.version}`;
+/**
+ * Pending drafts are bound to the version they review. A settled proposal's
+ * content no longer changes, but execution bumps its version, so its draft
+ * is keyed without it.
+ */
+export function planDraftKey(proposal: Pick<PlanProposal, "sessionId" | "id" | "version" | "status">): string {
+  return `${proposal.sessionId}:${proposal.id}:${proposal.status === "pending" ? proposal.version : "settled"}`;
 }
 
+/** Pending drafts review the submission; settled drafts start from what executes. */
 export function createPlanDraft(proposal: PlanProposal): PlanDraft {
+  const settled = proposal.status !== "pending";
+  const steps = (settled ? proposal.resolvedSteps : undefined) ?? proposal.steps ?? [];
+  const design = (settled ? proposal.resolvedDesign : undefined) ?? proposal.design;
   return {
     key: planDraftKey(proposal),
-    baseSteps: structuredClone(proposal.steps ?? []),
-    baseDesign: structuredClone(proposal.design),
-    steps: structuredClone(proposal.steps ?? []),
-    design: structuredClone(proposal.design),
+    baseSteps: structuredClone(steps),
+    baseDesign: structuredClone(design),
+    steps: structuredClone(steps),
+    design: structuredClone(design),
+    baseMarkdown: proposal.markdown,
+    markdown: proposal.markdown,
   };
 }
 
 export function planDraftReducer(draft: PlanDraft, action: PlanDraftAction): PlanDraft {
   switch (action.type) {
     case "reset":
-      return { ...draft, steps: structuredClone(draft.baseSteps), design: structuredClone(draft.baseDesign), editingStepId: undefined };
+      return {
+        ...draft,
+        steps: structuredClone(draft.baseSteps),
+        design: structuredClone(draft.baseDesign),
+        markdown: draft.baseMarkdown,
+        editingStepId: undefined,
+        tasksEditing: undefined,
+      };
+    case "markdownSet":
+      return { ...draft, markdown: action.value };
+    case "tasksEdit":
+      return { ...draft, tasksEditing: true };
     case "stepAdd":
       if (draft.steps.some((step) => step.id === action.id)) return draft;
       return { ...draft, steps: [...draft.steps, { id: action.id, title: "", dependsOn: [] }], editingStepId: action.id };
@@ -93,7 +122,7 @@ export function planDraftReducer(draft: PlanDraft, action: PlanDraftAction): Pla
   }
 }
 
-function reduceDesign(design: PlanDesignSpec, action: Exclude<PlanDraftAction, { type: `step${string}` | "reset" }>): PlanDesignSpec {
+function reduceDesign(design: PlanDesignSpec, action: Exclude<PlanDraftAction, { type: `step${string}` | "markdownSet" | "tasksEdit" | "reset" }>): PlanDesignSpec {
   switch (action.type) {
     case "designAddKeyword":
       return { ...design, styleKeywords: [...(design.styleKeywords ?? []), action.value] };
@@ -141,12 +170,13 @@ export function planDraftValidation(draft: PlanDraft) {
   return design.ok ? null : design;
 }
 
-export function planDraftRevision(draft: PlanDraft): { revisedSteps?: PlanStep[]; revisedDesign?: PlanDesignSpec } {
+export function planDraftRevision(draft: PlanDraft): PlanRevision {
   const steps = normalizedSteps(draft.steps);
   const design = normalizedDesign(draft.design);
   return {
     ...(!planStepsEqual(steps, normalizedSteps(draft.baseSteps)) ? { revisedSteps: steps } : {}),
     ...(!planDesignEqual(design, normalizedDesign(draft.baseDesign)) ? { revisedDesign: design } : {}),
+    ...(draft.markdown !== draft.baseMarkdown ? { revisedMarkdown: draft.markdown } : {}),
   };
 }
 
@@ -155,7 +185,7 @@ export function planDraftDirty(draft: PlanDraft): boolean {
 }
 
 /** The changed parts of a draft, as carried by `plans.resolve` approve. */
-export type PlanRevision = { revisedSteps?: PlanStep[]; revisedDesign?: PlanDesignSpec };
+export type PlanRevision = { revisedSteps?: PlanStep[]; revisedDesign?: PlanDesignSpec; revisedMarkdown?: string };
 
 /**
  * Builds the approve half of a `plans.resolve` request. `revision` is the
@@ -167,12 +197,14 @@ export function buildApproveRequest(
   proposal: PlanProposal,
   mode: GlobalPermissionMode,
   revision?: PlanRevision,
+  targetModel?: PlanTargetModel,
 ): PlanResolveRequest {
   return {
     ...proposalIdentity(proposal),
     action: "approve",
     targetPermissionMode: mode,
     ...(proposal.kind === "plan" ? revision : undefined),
+    ...(targetModel ? { targetModel } : undefined),
   };
 }
 

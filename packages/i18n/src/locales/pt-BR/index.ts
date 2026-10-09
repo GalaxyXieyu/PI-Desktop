@@ -579,8 +579,6 @@ export const ptBR = {
   },
   plan: {
     revise: "Revisar plano",
-    revisePrompt:
-      "Revise o plano existente \"{{title}}\" ({{path}}) e envie uma nova versão. Alterações:\n",
     build: "Construir",
     dependencyGraph: "Grafo de dependências",
     newTask: "Nova",
@@ -589,6 +587,11 @@ export const ptBR = {
     viewPlan: "Ver plano",
     reviewEditPlan: "Revisar e editar plano",
     document: "Plano",
+    documentEditor: "Editar corpo do plano",
+    editTasks: "Editar tarefas",
+    reviseEditedPrompt: "Editei o plano \"{{title}}\" ({{path}}). Envie uma nova versão com base no plano editado abaixo e mantenha tudo o que não alterei.",
+    executionModel: "Modelo de execução",
+    executionModelSession: "Modelo da sessão · {{model}}",
     goalKind: "Objetivo",
     designSpec: "Especificação de design",
     taskCount: "{{count}} tarefas",
@@ -665,9 +668,6 @@ export const ptBR = {
     graphDirectionVertical: "Vertical",
   },
   goal: {
-    revise: "Revisar meta",
-    revisePrompt:
-      "Revise a meta existente \"{{title}}\" ({{path}}) e envie uma nova versão. Alterações:\n",
     viewPlan: "Ver plano",
     reviewEditPlan: "Revisar e editar plano",
     planning: "Definindo objetivo",

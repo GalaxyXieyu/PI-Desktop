@@ -593,8 +593,6 @@ export const en = {
   },
   plan: {
     revise: "Revise plan",
-    revisePrompt:
-      "Revise the existing plan \"{{title}}\" ({{path}}) and submit a new version. Changes:\n",
     build: "Build",
     dependencyGraph: "Dependency graph",
     newTask: "New",
@@ -603,6 +601,11 @@ export const en = {
     viewPlan: "View plan",
     reviewEditPlan: "Review & edit plan",
     document: "Plan",
+    documentEditor: "Edit plan body",
+    editTasks: "Edit tasks",
+    reviseEditedPrompt: "I edited the plan \"{{title}}\" ({{path}}). Submit a new version based on the edited plan below and keep everything I did not change.",
+    executionModel: "Execution model",
+    executionModelSession: "Session model · {{model}}",
     goalKind: "Goal",
     designSpec: "Design spec",
     taskCount: "{{count}} tasks",
@@ -679,9 +682,6 @@ export const en = {
     graphDirectionVertical: "Vertical",
   },
   goal: {
-    revise: "Revise goal",
-    revisePrompt:
-      "Revise the existing goal \"{{title}}\" ({{path}}) and submit a new version. Changes:\n",
     viewPlan: "View plan",
     reviewEditPlan: "Review & edit plan",
     planning: "Defining goal",

@@ -469,6 +469,8 @@ type PlanResolveRequest =
       targetPermissionMode: GlobalPermissionMode;
       revisedSteps?: PlanStep[];
       revisedDesign?: PlanDesignSpec;
+      revisedMarkdown?: string;
+      targetModel?: { providerId: string; modelId: string };
     })
   | (PlanResolveIdentity & { action: "reject" });
 

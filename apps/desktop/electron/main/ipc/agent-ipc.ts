@@ -960,8 +960,13 @@ export function registerAgentIpc({
     if (action !== "approve" && action !== "reject") {
       throw new Error("invalid plan approval action");
     }
-    const revisions: Pick<PlanResolveRequest, "revisedSteps" | "revisedDesign"> = {};
-    if (action === "reject" && (resolution.revisedSteps !== undefined || resolution.revisedDesign !== undefined)) {
+    const revisions: Pick<PlanResolveRequest, "revisedSteps" | "revisedDesign" | "revisedMarkdown" | "targetModel"> = {};
+    if (action === "reject" && (
+      resolution.revisedSteps !== undefined ||
+      resolution.revisedDesign !== undefined ||
+      resolution.revisedMarkdown !== undefined ||
+      resolution.targetModel !== undefined
+    )) {
       throw Object.assign(new Error("Plan revisions require approval"), {
         errorCode: ErrorCodes.PLAN_INVALID_ARGUMENT,
       });
@@ -976,6 +981,25 @@ export function registerAgentIpc({
         const result = validatePlanDesign(resolution.revisedDesign);
         if (!result.ok) throw Object.assign(new Error(result.message), { errorCode: result.code });
         revisions.revisedDesign = result.value;
+      }
+      if (resolution.revisedMarkdown !== undefined) {
+        if (typeof resolution.revisedMarkdown !== "string") {
+          throw Object.assign(new Error("revisedMarkdown must be a string"), {
+            errorCode: ErrorCodes.PLAN_INVALID_ARGUMENT,
+          });
+        }
+        revisions.revisedMarkdown = resolution.revisedMarkdown;
+      }
+      if (resolution.targetModel !== undefined) {
+        const trimmed = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+        const providerId = trimmed(resolution.targetModel?.providerId);
+        const modelId = trimmed(resolution.targetModel?.modelId);
+        if (!providerId || !modelId) {
+          throw Object.assign(new Error("targetModel requires providerId and modelId"), {
+            errorCode: ErrorCodes.PLAN_INVALID_ARGUMENT,
+          });
+        }
+        revisions.targetModel = { providerId, modelId };
       }
     }
     let targetPermissionMode: GlobalPermissionMode | undefined;

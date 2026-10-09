@@ -57,7 +57,7 @@ test("List/Graph switches preserve progress and render updated draft/effective s
     }
     return renderToStaticMarkup(createElement(I18nextProvider, { i18n }, createElement(Probe)));
   };
-  const proposal = { id: "p", sessionId: "s", version: 1, status: "pending", steps: [
+  const proposal = { id: "p", sessionId: "s", version: 1, status: "pending", markdown: "Body", steps: [
     { id: "a", title: "Prepare", dependsOn: [] },
     { id: "b", title: "Build", dependsOn: ["a"] },
   ] };
@@ -81,7 +81,7 @@ test("List/Graph switches preserve progress and render updated draft/effective s
   // Exercise the actual editor/document wiring, not just the section props.
   const renderDocument = (props) => renderToStaticMarkup(createElement(I18nextProvider,
     { i18n }, createElement(PlanDocument, props)));
-  const pendingProps = { proposal: { ...proposal, kind: "plan", title: "Plan", markdown: "Body" },
+  const pendingProps = { proposal: { ...proposal, kind: "plan", title: "Plan" },
     draft, editable: true, dispatch: () => {} };
   assert.match(renderDocument(pendingProps), /data-testid="plan-step-deps"/);
   view = "graph";

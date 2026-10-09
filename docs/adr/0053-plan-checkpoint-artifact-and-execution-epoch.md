@@ -7,6 +7,7 @@
 - Protocol: v9
 - Storage schema: v10
 - Amended by: ADR interactive-plan-structured-revision (structured Plan metadata and approval revisions)
+- Amended by: ADR plan-body-approval-revision (an edited Plan body is published as a new artifact at approval)
 
 ## Context
 

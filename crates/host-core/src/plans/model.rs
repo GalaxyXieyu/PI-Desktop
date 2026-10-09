@@ -146,6 +146,8 @@ pub struct PlanResolveParams<'a> {
     pub target_permission_mode: Option<&'a str>,
     pub revised_steps: Option<&'a serde_json::Value>,
     pub revised_design: Option<&'a serde_json::Value>,
+    pub revised_markdown: Option<&'a serde_json::Value>,
+    pub target_model: Option<&'a serde_json::Value>,
 }
 
 /// Authoritative display metadata for one immutable submission in a history page.

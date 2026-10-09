@@ -581,8 +581,6 @@ export const es = {
   },
   "plan": {
     revise: "Revisar plan",
-    revisePrompt:
-      "Revisa el plan existente \"{{title}}\" ({{path}}) y envía una nueva versión. Cambios:\n",
     build: "Construir",
     dependencyGraph: "Grafo de dependencias",
     newTask: "Nueva",
@@ -591,6 +589,11 @@ export const es = {
     viewPlan: "Ver plan",
     reviewEditPlan: "Revisar y editar plan",
     document: "Plan",
+    documentEditor: "Editar el cuerpo del plan",
+    editTasks: "Editar tareas",
+    reviseEditedPrompt: "Edité el plan \"{{title}}\" ({{path}}). Envía una nueva versión basada en el plan editado de abajo y conserva todo lo que no cambié.",
+    executionModel: "Modelo de ejecución",
+    executionModelSession: "Modelo de la sesión · {{model}}",
     goalKind: "Objetivo",
     designSpec: "Especificación de diseño",
     taskCount: "{{count}} tareas",
@@ -667,9 +670,6 @@ export const es = {
     "graphDirectionVertical": "Vertical",
   },
   "goal": {
-    revise: "Revisar objetivo",
-    revisePrompt:
-      "Revisa el objetivo existente \"{{title}}\" ({{path}}) y envía una nueva versión. Cambios:\n",
     viewPlan: "Ver plan",
     reviewEditPlan: "Revisar y editar plan",
     "planning": "Definición de meta",

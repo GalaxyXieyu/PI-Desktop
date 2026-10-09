@@ -79,6 +79,21 @@ Design 只接受 `framework`、`componentLibrary`、`styleKeywords`、
 审批审计只增加 `revisedSteps` / `revisedDesign` 布尔值和 `seededTodos`
 计数，绝不包含元数据文本。
 
+批准还可以携带 `revisedMarkdown`，即编辑后的正文字符串（ADR
+plan-body-approval-revision）。reject 携带它、空白或非字符串值、或存储的
+Goal 与其他修订一样失败；超长正文以 `PLAN_MARKDOWN_TOO_LARGE` 失败；
+与提交逐字节相同的正文不算修订。工件校验之后，主机把正文发布为新工件，
+审批事务把该行的正文与工件指向它并记录写入。事务失败会删除新文件；
+提交的文件绝不被改写。审计增加 `revisedMarkdown` 布尔值和提交工件的
+身份，绝不包含文本。执行使用该行的正文与工件。
+
+Plan 或 Goal 的批准可以携带 `targetModel: { providerId, modelId }`（ADR
+plan-body-approval-revision）。审批事务在切换到 Agent 模式和目标权限模式的
+同时设置会话的 `provider_id` / `model_id`，因此执行以该模型启动，会话此后
+保留它。reject 携带它、或 id 非字符串/空白，以 `PLAN_INVALID_ARGUMENT`
+失败且不做任何更改。审计增加 `executionModel`（id 或 null）。审批行不存储
+该字段，重放忽略它。
+
 提交之后，`plans.resolve` 发出既有的 `plans.changed` 通知，并且仅当本次
 调用播种了行时，才发出带确切 TodoWrite 负载形状的 `todos.changed` 已提交
 快照。幂等重放绝不重新播种或重新发出 `todos.changed`。JSON 结果中不添加

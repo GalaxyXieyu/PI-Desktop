@@ -581,8 +581,6 @@ export const de = {
   },
   "plan": {
     revise: "Plan überarbeiten",
-    revisePrompt:
-      "Überarbeite den bestehenden Plan „{{title}}“ ({{path}}) und reiche eine neue Version ein. Änderungen:\n",
     build: "Erstellen",
     dependencyGraph: "Abhängigkeitsgraph",
     newTask: "Neu",
@@ -591,6 +589,11 @@ export const de = {
     viewPlan: "Plan ansehen",
     reviewEditPlan: "Plan prüfen und bearbeiten",
     document: "Plan",
+    documentEditor: "Plantext bearbeiten",
+    editTasks: "Aufgaben bearbeiten",
+    reviseEditedPrompt: "Ich habe den Plan „{{title}}“ ({{path}}) bearbeitet. Reiche eine neue Version auf Basis des bearbeiteten Plans unten ein und behalte alles bei, was ich nicht geändert habe.",
+    executionModel: "Ausführungsmodell",
+    executionModelSession: "Sitzungsmodell · {{model}}",
     goalKind: "Ziel",
     designSpec: "Designvorgaben",
     taskCount: "{{count}} Aufgaben",
@@ -667,9 +670,6 @@ export const de = {
     "graphDirectionVertical": "Vertikal",
   },
   "goal": {
-    revise: "Ziel überarbeiten",
-    revisePrompt:
-      "Überarbeite das bestehende Ziel „{{title}}“ ({{path}}) und reiche eine neue Version ein. Änderungen:\n",
     viewPlan: "Plan ansehen",
     reviewEditPlan: "Plan prüfen und bearbeiten",
     "planning": "Ziel definieren",

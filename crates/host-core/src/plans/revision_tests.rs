@@ -54,6 +54,27 @@ impl Fixture {
         steps: Option<&Value>,
         design: Option<&Value>,
     ) -> Result<PlanResolution> {
+        self.resolve_with_markdown(action, steps, design, None)
+    }
+
+    fn resolve_with_markdown(
+        &self,
+        action: &str,
+        steps: Option<&Value>,
+        design: Option<&Value>,
+        markdown: Option<&Value>,
+    ) -> Result<PlanResolution> {
+        self.resolve_with_inputs(action, steps, design, markdown, None)
+    }
+
+    fn resolve_with_inputs(
+        &self,
+        action: &str,
+        steps: Option<&Value>,
+        design: Option<&Value>,
+        markdown: Option<&Value>,
+        model: Option<&Value>,
+    ) -> Result<PlanResolution> {
         PlanManager.resolve(
             &self.db,
             PlanResolveParams {
@@ -67,6 +88,8 @@ impl Fixture {
                 target_permission_mode: Some("ask"),
                 revised_steps: steps,
                 revised_design: design,
+                revised_markdown: markdown,
+                target_model: model,
             },
         )
     }
@@ -449,4 +472,171 @@ fn revisions_do_not_bypass_artifact_verification() {
     .unwrap();
     assert!(f.resolve("approve", Some(&steps()), None).is_err());
     f.assert_unchanged();
+}
+
+fn plan_files(f: &Fixture) -> usize {
+    fs::read_dir(f.dir.path().join(".pi/plan")).unwrap().count()
+}
+
+#[test]
+fn revised_markdown_publishes_new_artifact_for_execution() {
+    let f = Fixture::new(KIND_PLAN, Some(&steps()), None);
+    let original = f.proposal.artifact.clone().unwrap();
+    let original_bytes = fs::read(f.dir.path().join(&original.relative_path)).unwrap();
+    let revised = json!("# Edited\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n");
+    let result = f
+        .resolve_with_markdown("approve", None, None, Some(&revised))
+        .unwrap();
+    let artifact = result.proposal.artifact.clone().unwrap();
+    assert_ne!(artifact.relative_path, original.relative_path);
+    let bytes = fs::read(f.dir.path().join(&artifact.relative_path)).unwrap();
+    assert_eq!(bytes, revised.as_str().unwrap().as_bytes());
+    assert_eq!(hex::encode(Sha256::digest(&bytes)), artifact.sha256);
+    assert_eq!(
+        fs::read(f.dir.path().join(&original.relative_path)).unwrap(),
+        original_bytes
+    );
+    assert_eq!(result.proposal.markdown, revised.as_str().unwrap());
+    let execution = result.execution.clone().unwrap();
+    assert_eq!(execution.plan, revised.as_str().unwrap());
+    assert_eq!(execution.artifact, artifact);
+    let claimed = PlanManager.claim_execution(&f.db, &execution.id).unwrap();
+    assert_eq!(claimed.plan, execution.plan);
+    let audit: String =
+        f.db.conn()
+            .query_row(
+                "SELECT payload_json FROM audit_log WHERE kind = 'plan_approval_resolved'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+    let audit: Value = serde_json::from_str(&audit).unwrap();
+    assert_eq!(audit["revisedMarkdown"], true);
+    assert_eq!(audit["submittedArtifact"], json!(original));
+    assert!(!audit.to_string().contains("Edited"));
+
+    let retried = f
+        .resolve_with_markdown("approve", None, None, Some(&revised))
+        .unwrap();
+    assert_eq!(retried.proposal.artifact, result.proposal.artifact);
+    assert_eq!(retried.proposal.markdown, result.proposal.markdown);
+    assert_eq!(plan_files(&f), 2);
+}
+
+#[test]
+fn unchanged_markdown_keeps_submitted_artifact() {
+    let f = Fixture::new(KIND_PLAN, None, None);
+    let same = json!(f.proposal.markdown);
+    let result = f
+        .resolve_with_markdown("approve", None, None, Some(&same))
+        .unwrap();
+    assert_eq!(result.proposal.artifact, f.proposal.artifact);
+    assert_eq!(plan_files(&f), 1);
+}
+
+#[test]
+fn invalid_markdown_revisions_leave_approval_and_files_unchanged() {
+    let oversized = json!("x".repeat(PLAN_MAX_MARKDOWN_BYTES + 1));
+    for (kind, action, markdown, code) in [
+        (
+            KIND_PLAN,
+            "reject",
+            json!("# Edited"),
+            "PLAN_INVALID_ARGUMENT",
+        ),
+        (KIND_PLAN, "approve", json!("  \n"), "PLAN_INVALID_ARGUMENT"),
+        (KIND_PLAN, "approve", json!(42), "PLAN_INVALID_ARGUMENT"),
+        (
+            KIND_GOAL,
+            "approve",
+            json!("# Edited"),
+            "PLAN_METADATA_UNSUPPORTED",
+        ),
+        (KIND_PLAN, "approve", oversized, "PLAN_MARKDOWN_TOO_LARGE"),
+    ] {
+        let f = Fixture::new(kind, None, None);
+        let error = f
+            .resolve_with_markdown(action, None, None, Some(&markdown))
+            .unwrap_err()
+            .to_string();
+        assert!(error.starts_with(code), "{error}");
+        f.assert_unchanged();
+        assert_eq!(
+            fs::read_dir(f.dir.path().join(format!(".pi/{kind}")))
+                .unwrap()
+                .count(),
+            1
+        );
+    }
+}
+
+#[test]
+fn failed_commit_removes_revised_artifact() {
+    let f = Fixture::new(KIND_PLAN, Some(&steps()), None);
+    f.db.conn().execute_batch("CREATE TEMP TRIGGER fail_seed BEFORE INSERT ON session_todo BEGIN SELECT RAISE(ABORT, 'injected seed failure'); END;").unwrap();
+    assert!(f
+        .resolve_with_markdown("approve", None, None, Some(&json!("# Edited")))
+        .is_err());
+    f.assert_unchanged();
+    assert_eq!(plan_files(&f), 1);
+}
+
+fn session_model(f: &Fixture) -> (Option<String>, Option<String>) {
+    f.db.conn()
+        .query_row(
+            "SELECT provider_id, model_id FROM sessions WHERE id = ?1",
+            [&f.proposal.session_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap()
+}
+
+#[test]
+fn approval_switches_the_session_to_the_execution_model() {
+    let f = Fixture::new(KIND_PLAN, None, None);
+    let model = json!({"providerId":" fast ","modelId":" flash "});
+    let result = f
+        .resolve_with_inputs("approve", None, None, None, Some(&model))
+        .unwrap();
+    assert_eq!(result.proposal.status, STATUS_APPROVED);
+    assert_eq!(
+        session_model(&f),
+        (Some("fast".into()), Some("flash".into()))
+    );
+    let audit: String =
+        f.db.conn()
+            .query_row(
+                "SELECT payload_json FROM audit_log WHERE kind = 'plan_approval_resolved'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+    let audit: Value = serde_json::from_str(&audit).unwrap();
+    assert_eq!(
+        audit["executionModel"],
+        json!({"providerId":"fast","modelId":"flash"})
+    );
+
+    let kept = Fixture::new(KIND_GOAL, None, None);
+    kept.resolve("approve", None, None).unwrap();
+    assert_eq!(session_model(&kept), (None, None));
+}
+
+#[test]
+fn invalid_execution_models_leave_approval_unchanged() {
+    for (action, model) in [
+        ("reject", json!({"providerId":"fast","modelId":"flash"})),
+        ("approve", json!({"providerId":"fast"})),
+        ("approve", json!({"providerId":" ","modelId":"flash"})),
+        ("approve", json!("fast/flash")),
+    ] {
+        let f = Fixture::new(KIND_PLAN, None, None);
+        let error = f
+            .resolve_with_inputs(action, None, None, None, Some(&model))
+            .unwrap_err()
+            .to_string();
+        assert!(error.starts_with("PLAN_INVALID_ARGUMENT"), "{error}");
+        f.assert_unchanged();
+        assert_eq!(session_model(&f), (None, None));
+    }
 }

@@ -31,6 +31,8 @@ fn plan_history_returns_authoritative_approved_snapshot_without_rewriting_transc
                 target_permission_mode: Some("ask"),
                 revised_steps: None,
                 revised_design: None,
+                revised_markdown: None,
+                target_model: None,
             },
         )
         .unwrap();
@@ -121,6 +123,8 @@ fn plan_history_preserves_submitted_metadata_and_approval_revisions() {
                     target_permission_mode: Some("ask"),
                     revised_steps: revised_steps.as_ref(),
                     revised_design: revised_design.as_ref(),
+                    revised_markdown: None,
+                    target_model: None,
                 },
             )
             .unwrap();
@@ -172,6 +176,8 @@ fn plan_history_is_page_scoped_survives_reopen_and_retains_superseded_versions()
                 target_permission_mode: None,
                 revised_steps: None,
                 revised_design: None,
+                revised_markdown: None,
+                target_model: None,
             },
         )
         .unwrap();

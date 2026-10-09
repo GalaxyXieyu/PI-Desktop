@@ -125,6 +125,30 @@ pub fn gate_session_configure(
     Ok(())
 }
 
+/// `{ providerId, modelId }` the approved execution runs on; absent or null
+/// keeps the session model. Only approval may carry it.
+fn parse_target_model(
+    action: &str,
+    value: Option<&serde_json::Value>,
+) -> Result<Option<(String, String)>> {
+    let Some(value) = value.filter(|value| !value.is_null()) else {
+        return Ok(None);
+    };
+    let field = |key: &str| {
+        value
+            .get(key)
+            .and_then(|field| field.as_str())
+            .map(str::trim)
+            .filter(|field| !field.is_empty())
+    };
+    match (action, field("providerId"), field("modelId")) {
+        ("approve", Some(provider), Some(model)) => {
+            Ok(Some((provider.to_string(), model.to_string())))
+        }
+        _ => Err(plan_error("PLAN_INVALID_ARGUMENT")),
+    }
+}
+
 impl PlanManager {
     pub fn enter(
         &self,
@@ -382,6 +406,8 @@ impl PlanManager {
             target_permission_mode,
             revised_steps,
             revised_design,
+            revised_markdown,
+            target_model,
         } = params;
         expire_pending_approvals(db)?;
         let Some(current) = get_proposal(db, proposal_id)? else {
@@ -399,10 +425,17 @@ impl PlanManager {
         if !matches!(action, "approve" | "reject") {
             return Err(plan_error("PLAN_INVALID_ACTION"));
         }
-        let revision = revision::Revision::normalize(action, kind, revised_steps, revised_design)?;
+        let revision = revision::Revision::normalize(
+            action,
+            &current,
+            revised_steps,
+            revised_design,
+            revised_markdown,
+        )?;
         if current.status == STATUS_EXPIRED {
             return Err(plan_error("PLAN_APPROVAL_TIMEOUT"));
         }
+        let execution_model = parse_target_model(action, target_model)?;
         let selected = if action == "approve" {
             let Some(selected) = target_permission_mode else {
                 return Err(plan_error("PLAN_PERMISSION_MODE_REQUIRED"));
@@ -427,7 +460,7 @@ impl PlanManager {
             return Err(plan_error("PLAN_APPROVAL_STALE"));
         }
 
-        if action == "approve" {
+        let published = if action == "approve" {
             let workspace_root =
                 workspace_root.ok_or_else(|| plan_error("PLAN_WORKSPACE_REQUIRED"))?;
             let artifact = current
@@ -435,7 +468,59 @@ impl PlanManager {
                 .clone()
                 .ok_or_else(|| plan_error("PLAN_ARTIFACT_NOT_READY"))?;
             verify_artifact(workspace_root, kind, &artifact)?;
+            revision
+                .markdown
+                .as_deref()
+                .map(|markdown| publish_artifact(workspace_root, kind, &current.title, markdown))
+                .transpose()?
+        } else {
+            None
+        };
+        let revised_artifact = published.as_ref().map(|(artifact, _)| artifact);
+        let committed = self.commit_resolution(
+            db,
+            &current,
+            kind,
+            action,
+            selected,
+            &revision,
+            revised_artifact,
+            execution_model.as_ref(),
+        );
+        if committed.is_err() {
+            if let Some((_, path)) = &published {
+                let _ = fs::remove_file(path);
+            }
         }
+        let seeded_todos = committed?;
+        let proposal =
+            get_proposal(db, proposal_id)?.ok_or_else(|| plan_error("PLAN_NOT_FOUND"))?;
+        let mut resolution = resolution_from_proposal(proposal)?;
+        resolution.seeded_todos = seeded_todos > 0;
+        Ok(resolution)
+    }
+
+    /// Applies one resolution in a single transaction; returns the number of
+    /// seeded todos. A revised body replaces the row's artifact pointer.
+    #[allow(clippy::too_many_arguments)]
+    fn commit_resolution(
+        &self,
+        db: &Database,
+        current: &PlanProposal,
+        kind: &str,
+        action: &str,
+        selected: Option<&str>,
+        revision: &revision::Revision,
+        revised_artifact: Option<&PlanArtifact>,
+        execution_model: Option<&(String, String)>,
+    ) -> Result<usize> {
+        let PlanProposal {
+            id: proposal_id,
+            session_id,
+            turn_id,
+            tool_call_id,
+            ..
+        } = current;
         let now = now_ms();
         let status = match action {
             "approve" => STATUS_APPROVED,
@@ -458,10 +543,19 @@ impl PlanManager {
             let changed = tx
                 .prepare_cached(
                     "UPDATE sessions
-                 SET mode = 'agent', permission_mode = ?1, updated_at = ?2
+                 SET mode = 'agent', permission_mode = ?1, updated_at = ?2,
+                     provider_id = COALESCE(?5, provider_id),
+                     model_id = COALESCE(?6, model_id)
                  WHERE id = ?3 AND mode = ?4",
                 )?
-                .execute(params![selected, now, session_id, kind])?;
+                .execute(params![
+                    selected,
+                    now,
+                    session_id,
+                    kind,
+                    execution_model.map(|(provider, _)| provider),
+                    execution_model.map(|(_, model)| model),
+                ])?;
             if changed == 0 {
                 return Err(plan_error("PLAN_NOT_ACTIVE"));
             }
@@ -473,7 +567,11 @@ impl PlanManager {
                   resolved_at = ?4, updated_at = ?4,
                   error_code = NULL, version = version + 1,
                   execution_id = ?5, execution_state = ?6,
-                  resolved_steps_json = ?13, resolved_design_json = ?14
+                  resolved_steps_json = ?13, resolved_design_json = ?14,
+                  plan_json = COALESCE(?15, plan_json),
+                  artifact_relative_path = COALESCE(?16, artifact_relative_path),
+                  artifact_sha256 = COALESCE(?17, artifact_sha256),
+                  artifact_size_bytes = COALESCE(?18, artifact_size_bytes)
               WHERE request_id = ?7 AND session_id = ?8 AND turn_id = ?9
                 AND tool_call_id = ?10 AND status = 'pending' AND version = ?11
                  AND expires_at > ?12",
@@ -493,11 +591,24 @@ impl PlanManager {
                 now,
                 revision.steps_json,
                 revision.design_json,
+                revised_artifact.and(revision.markdown.as_deref()),
+                revised_artifact.map(|artifact| &artifact.relative_path),
+                revised_artifact.map(|artifact| &artifact.sha256),
+                revised_artifact.map(|artifact| artifact.size_bytes as i64),
             ])?;
         if changed != 1 {
             return Err(plan_error("PLAN_APPROVAL_STALE"));
         }
-        let seeded_todos = revision.seed_todos(&tx, &current, action)?;
+        if let Some(artifact) = revised_artifact {
+            artifacts::record_tx(
+                &tx,
+                session_id,
+                &artifact.relative_path,
+                "write",
+                Some(turn_id),
+            )?;
+        }
+        let seeded_todos = revision.seed_todos(&tx, current, action)?;
         audit::append_tx(
             &tx,
             "plan_approval_resolved",
@@ -515,15 +626,16 @@ impl PlanManager {
                 "executionState": (action == "approve").then_some(EXECUTION_QUEUED),
                 "revisedSteps": revision.steps_json.is_some(),
                 "revisedDesign": revision.design_json.is_some(),
+                "revisedMarkdown": revised_artifact.is_some(),
+                "submittedArtifact": revised_artifact.and(current.artifact.as_ref()),
+                "executionModel": execution_model.map(|(provider, model)| {
+                    json!({ "providerId": provider, "modelId": model })
+                }),
                 "seededTodos": seeded_todos,
             }),
         )?;
         tx.commit()?;
-        let proposal =
-            get_proposal(db, proposal_id)?.ok_or_else(|| plan_error("PLAN_NOT_FOUND"))?;
-        let mut resolution = resolution_from_proposal(proposal)?;
-        resolution.seeded_todos = seeded_todos > 0;
-        Ok(resolution)
+        Ok(seeded_todos)
     }
 
     pub fn abort_session(&self, db: &Database, session_id: &str) -> Result<bool> {

@@ -362,3 +362,4 @@ Each ADR includes:
 | 0318 | [Publish native Linux arm64 artifacts](0318-linux-arm64-release-lane.md) | Accepted (D638) |
 | 0319 | [Inline external imports in owning Settings destinations](0319-settings-inline-imports.md) | Accepted (D645) |
 | interactive-plan-structured-revision | [Interactive Plan structured revision](interactive-plan-structured-revision.md) | Accepted for implementation (amends ADR 0053 and 0312) |
+| plan-body-approval-revision | [Edit the Plan body and choose the execution model at approval](plan-body-approval-revision.md) | Accepted for implementation (D650, D651; amends ADR 0053 and interactive-plan-structured-revision) |

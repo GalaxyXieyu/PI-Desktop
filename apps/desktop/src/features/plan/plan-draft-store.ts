@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { create } from "zustand";
 import type { PlanProposal } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
@@ -12,7 +12,6 @@ type DraftState = {
 export const usePlanDraftStore = create<DraftState>((set) => ({
   drafts: {},
   dispatch: (proposal, action) => {
-    if (proposal.status !== "pending") return;
     const key = planDraftKey(proposal);
     set((state) => ({ drafts: {
       ...state.drafts,
@@ -31,17 +30,17 @@ export function discardPlanDraft(key: string): void {
 }
 
 // The store owns this renderer-lifetime observer, not either approval surface.
-// Closing the tab must retain edits, but resolving a hidden proposal must not.
+// Closing the tab must retain edits, but resolving a hidden proposal must drop
+// its review draft. Settled drafts live until their revision is sent or reset.
 const unsubscribe = useAppStore.subscribe((state, previous) => {
-  for (const proposal of Object.values(previous.pendingPlans)) {
-    if (!proposal) continue;
-    const current = state.pendingPlans[proposal.sessionId];
-    if (!current || current.status !== "pending" || planDraftKey(current) !== planDraftKey(proposal)) {
-      discardPlanDraft(planDraftKey(proposal));
+  for (const source of ["pendingPlans", "planCheckpoints"] as const) {
+    for (const proposal of Object.values(previous[source])) {
+      if (proposal?.status !== "pending") continue;
+      const current = state[source][proposal.sessionId];
+      if (current?.status !== "pending" || planDraftKey(current) !== planDraftKey(proposal)) {
+        discardPlanDraft(planDraftKey(proposal));
+      }
     }
-  }
-  for (const proposal of Object.values(state.planCheckpoints)) {
-    if (proposal && proposal.status !== "pending") discardPlanDraft(planDraftKey(proposal));
   }
 });
 if (import.meta.hot) import.meta.hot.dispose(unsubscribe);
@@ -50,11 +49,8 @@ export function usePlanDraft(proposal: PlanProposal): [PlanDraft, (action: PlanD
   const key = planDraftKey(proposal);
   const saved = usePlanDraftStore((state) => state.drafts[key]);
   const base = useMemo(() => createPlanDraft(proposal), [proposal]);
-  useEffect(() => {
-    if (proposal.status !== "pending") discardPlanDraft(key);
-  }, [key, proposal.status]);
   const dispatch = useCallback((action: PlanDraftAction) => {
     usePlanDraftStore.getState().dispatch(proposal, action);
   }, [proposal]);
-  return [proposal.status === "pending" ? saved ?? base : base, dispatch];
+  return [saved ?? base, dispatch];
 }

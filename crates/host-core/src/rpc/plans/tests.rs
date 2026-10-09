@@ -48,7 +48,9 @@ async fn resolving_seeds_committed_todos_and_emits_both_notifications_once() {
     let resolve = json!({
         "sessionId":input["sessionId"], "turnId":input["turnId"], "toolCallId":"call",
         "proposalId":submitted["proposal"]["id"], "action":"approve", "targetPermissionMode":"ask",
-        "revisedSteps":[{"id":"revised","title":"Revised"}], "revisedDesign":{"framework":"vue"}
+        "revisedSteps":[{"id":"revised","title":"Revised"}], "revisedDesign":{"framework":"vue"},
+        "revisedMarkdown":"# Revised body\n",
+        "targetModel":{"providerId":"fast","modelId":"flash"}
     });
     let (tx, mut rx) = mpsc::unbounded_channel();
     let result = handle_request(state.clone(), "plans.resolve", resolve.clone(), tx.clone())
@@ -76,6 +78,13 @@ async fn resolving_seeds_committed_todos_and_emits_both_notifications_once() {
         result["proposal"]["resolvedSteps"]
     );
     assert_eq!(result["execution"]["design"], json!({"framework":"vue"}));
+    assert_eq!(result["execution"]["plan"], "# Revised body\n");
+    assert_eq!(result["proposal"]["markdown"], "# Revised body\n");
+    let session = call(&state, "session.get", json!({"id":input["sessionId"]}))
+        .await
+        .unwrap();
+    assert_eq!(session["session"]["providerId"], "fast");
+    assert_eq!(session["session"]["modelId"], "flash");
     assert!(result.get("seededTodos").is_none());
     let replay = handle_request(state.clone(), "plans.resolve", resolve, tx)
         .await

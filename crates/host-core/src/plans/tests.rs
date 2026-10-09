@@ -287,6 +287,8 @@ fn reject_has_no_side_effects_and_allows_new_turn_submission() {
                 target_permission_mode: None,
                 revised_steps: None,
                 revised_design: None,
+                revised_markdown: None,
+                target_model: None,
             },
         )
         .unwrap();
@@ -380,6 +382,8 @@ fn approval_switches_session_and_creates_outbox_atomically() {
                 target_permission_mode: Some("accept-edits"),
                 revised_steps: None,
                 revised_design: None,
+                revised_markdown: None,
+                target_model: None,
             },
         )
         .unwrap();
@@ -417,6 +421,8 @@ fn duplicate_resolution_returns_committed_result_and_conflict_is_stale() {
                 target_permission_mode: Some("auto"),
                 revised_steps: None,
                 revised_design: None,
+                revised_markdown: None,
+                target_model: None,
             },
         )
         .unwrap();
@@ -434,6 +440,8 @@ fn duplicate_resolution_returns_committed_result_and_conflict_is_stale() {
                 target_permission_mode: Some("auto"),
                 revised_steps: None,
                 revised_design: None,
+                revised_markdown: None,
+                target_model: None,
             },
         )
         .unwrap();
@@ -454,6 +462,8 @@ fn duplicate_resolution_returns_committed_result_and_conflict_is_stale() {
                     target_permission_mode: None,
                     revised_steps: None,
                     revised_design: None,
+                    revised_markdown: None,
+                    target_model: None,
                 },
             )
             .unwrap_err()
@@ -530,6 +540,8 @@ fn approval_deadline_expires_lazily_and_rejects_late_resolution() {
                     target_permission_mode: None,
                     revised_steps: None,
                     revised_design: None,
+                    revised_markdown: None,
+                    target_model: None,
                 },
             )
             .unwrap_err()
@@ -559,6 +571,8 @@ fn claim_and_finish_are_durable_cas_transitions() {
                 target_permission_mode: Some("auto"),
                 revised_steps: None,
                 revised_design: None,
+                revised_markdown: None,
+                target_model: None,
             },
         )
         .unwrap();
@@ -644,6 +658,8 @@ fn configure_gate_blocks_pending_and_active_execution_changes() {
                 target_permission_mode: Some("auto"),
                 revised_steps: None,
                 revised_design: None,
+                revised_markdown: None,
+                target_model: None,
             },
         )
         .unwrap();
@@ -794,6 +810,8 @@ fn goal_contract_round_trips_through_its_own_kind() {
                 target_permission_mode: Some("accept-edits"),
                 revised_steps: None,
                 revised_design: None,
+                revised_markdown: None,
+                target_model: None,
             },
         )
         .unwrap();

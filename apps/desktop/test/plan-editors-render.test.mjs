@@ -96,3 +96,19 @@ test("a goal proposal keeps the read-only document without editors or tab Build"
   assert.match(html, /Awaiting approval/);
   assert.doesNotMatch(html, /New task|plan-approval-approve-main|type="color"/);
 });
+
+test("a settled plan shows progress with Edit tasks, and Revise appears only after an edit", async (t) => {
+  const approved = { ...structured, status: "approved", executionState: "interrupted", resolvedSteps: structured.steps };
+  const { render, useAppStore, usePlanDraftStore } = await setup(t, approved);
+  useAppStore.setState({ pendingPlans: {} });
+  t.after(() => usePlanDraftStore.setState({ drafts: {} }));
+  const clean = render();
+  assert.match(clean, /data-testid="plan-tasks-edit"/);
+  assert.doesNotMatch(clean, /aria-label="Delete task"|data-testid="plan-revise"|>Build</);
+  usePlanDraftStore.getState().dispatch(approved, { type: "tasksEdit" });
+  assert.match(render(), /aria-label="Delete task"/);
+  usePlanDraftStore.getState().dispatch(approved, { type: "stepUpdate", id: "a", title: "Renamed" });
+  const edited = render();
+  assert.match(edited, /data-testid="plan-revise"/);
+  assert.match(edited, /Reset changes/);
+});

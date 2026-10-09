@@ -85,6 +85,24 @@ no running turn. Empty effective steps leave existing rows and revision untouche
 Any seeding failure rolls back the entire approval. The approval audit adds only
 `revisedSteps` / `revisedDesign` booleans and `seededTodos` count, never metadata text.
 
+Approval may also carry `revisedMarkdown`, the edited body string (ADR
+plan-body-approval-revision). Reject with it, a blank or non-string value, or
+a stored Goal fails like the other revisions; an oversized body fails with
+`PLAN_MARKDOWN_TOO_LARGE`; a byte-identical body is no revision. After
+artifact verification the host publishes the body as a new artifact, and the
+approval transaction points the row's body and artifact at it and records the
+write. A failed transaction removes the new file; the submitted file is never
+rewritten. The audit adds a `revisedMarkdown` boolean and the submitted
+artifact identity, never text. Execution uses the row's body and artifact.
+
+Approval of a Plan or Goal may carry `targetModel: { providerId, modelId }`
+(ADR plan-body-approval-revision). The approval transaction sets the
+session's `provider_id` / `model_id` together with Agent mode and the target
+permission mode, so execution launches on that model and the session keeps
+it. Reject with it or a non-string / blank id fails with
+`PLAN_INVALID_ARGUMENT` and changes nothing. The audit adds `executionModel`
+(ids or null). The approval row does not store it; replay ignores it.
+
 After commit, `plans.resolve` emits the existing `plans.changed` notification and,
 only if this call seeded rows, a `todos.changed` committed snapshot with exactly
 the TodoWrite payload shape. Idempotent replay never re-seeds or re-emits
@@ -116,10 +134,11 @@ proposals. Plans with structured metadata show task/design summary chips and
 use the review-and-edit label. The entry opens a session-scoped `plan:<id>` work
 panel tab; the artifact opener and chat links to the artifact open the same tab
 (D647), and the approval controls are unchanged.
-Once a proposal is settled and its execution is not queued or running, the
-local tab offers a revise action instead of in-place editing: it returns the
-idle session to the contract mode and seeds the composer so the Agent submits a
-new proposal (D648).
+A settled local Plan keeps an in-place draft keyed without the execution
+version. Once it differs from what executes, the tab offers a revise action
+that stops a running execution, returns the session to Plan mode, and sends the
+edited plan so the Agent submits a new proposal; the settled row is never
+changed (D652, amending D648).
 Tab sanitization, reordering, deduplication, and session switching retain this
 resource like other work-panel resources.
 

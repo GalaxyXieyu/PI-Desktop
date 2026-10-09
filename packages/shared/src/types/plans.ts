@@ -176,13 +176,21 @@ export type PlanResolveRequest =
       targetPermissionMode: GlobalPermissionMode;
       revisedSteps?: PlanStep[];
       revisedDesign?: PlanDesignSpec;
+      /** Edited Markdown body; the host publishes it as a new artifact. */
+      revisedMarkdown?: string;
+      /** Session model the approved execution runs on; omitted keeps the current one. */
+      targetModel?: PlanTargetModel;
     })
   | (PlanResolveIdentity & {
       action: "reject";
       targetPermissionMode?: never;
       revisedSteps?: never;
       revisedDesign?: never;
+      revisedMarkdown?: never;
+      targetModel?: never;
     });
+
+export type PlanTargetModel = { providerId: string; modelId: string };
 
 export type PlanResolutionResult = {
   ok: boolean;

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 import {
   PLAN_COLOR_GROUPS,
@@ -9,15 +10,18 @@ import {
   type PlanProposal,
   type PlanStep,
 } from "@pi-desktop/shared";
-import { Badge, Panel, cx } from "../ui";
+import { Badge, Button, Panel, cx } from "../ui";
+import { IconPencil } from "../icons";
 import { Markdown } from "../Markdown";
 import { useAppStore } from "../../stores/app-store";
-import type { PlanDraft, PlanDraftAction } from "../../features/plan/plan-draft-model";
+import { planDraftRevision, type PlanDraft, type PlanDraftAction } from "../../features/plan/plan-draft-model";
 import { planStepProgress, type PlanProgress } from "../../features/plan/plan-step-progress";
 import { PlanDesignEditor } from "./PlanDesignEditor";
 import { PlanStepsEditor } from "./PlanStepsEditor";
 import { PlanTasksSection } from "./PlanFlowchart";
 import { PlanStepDeps } from "./PlanStepDeps";
+
+const PlanMarkdownEditor = lazy(() => import("./PlanMarkdownEditor"));
 
 export function PlanDesignView({ design }: { design: PlanDesignSpec }) {
   const { t } = useTranslation();
@@ -124,14 +128,20 @@ export function PlanStepsView({
   steps,
   progress,
   executionState,
+  onEdit,
 }: {
   steps: PlanStep[];
   progress?: PlanProgress;
   executionState?: PlanExecutionState;
+  /** Settled local plans: switch the list to the editor. */
+  onEdit?: () => void;
 }) {
   const { t } = useTranslation();
   const statusByStepId = new Map(progress?.steps.map((step) => [step.stepId, step.status]) ?? []);
-  return <PlanTasksSection steps={steps} progress={progress} summary={
+  return <PlanTasksSection steps={steps} progress={progress} actions={onEdit &&
+    <Button size="sm" data-testid="plan-tasks-edit" onClick={onEdit}>
+      <IconPencil size={13} aria-hidden /> {t("plan.editTasks")}
+    </Button>} summary={
     progress && <p className="plan-progress" data-testid="plan-progress">
       {t("plan.progress", { done: progress.done, total: progress.total })}
       {executionState && <Badge tone={EXECUTION_BADGE_TONES[executionState]}>
@@ -164,7 +174,10 @@ export function PlanStepsView({
   </PlanTasksSection>;
 }
 
-/** Markdown is immutable; only pending structured data may come from a draft. */
+/**
+ * Local plans edit a draft. Pending edits ride the approval; settled edits are
+ * sent back to the agent as a revision request.
+ */
 export function PlanDocument({
   proposal,
   draft,
@@ -173,38 +186,42 @@ export function PlanDocument({
 }: {
   proposal: PlanProposal;
   draft?: PlanDraft;
-  /** Pending local Plan: swap the read-only views for the editors. */
+  /** Local Plan: swap the read-only views for the editors. */
   editable?: boolean;
   dispatch?: (action: PlanDraftAction) => void;
 }) {
   const { t } = useTranslation();
   const pending = proposal.status === "pending";
-  const steps = pending ? draft?.steps ?? proposal.steps ?? [] : effectivePlanSteps(proposal);
-  const design = pending ? draft ? draft.design : proposal.design : effectivePlanDesign(proposal);
   const editing = editable && !!draft && !!dispatch;
+  const steps = editing ? draft.steps : effectivePlanSteps(proposal);
+  const design = editing ? draft.design : effectivePlanDesign(proposal);
+  const editingTasks = editing && (pending || !!draft.tasksEditing || !!planDraftRevision(draft).revisedSteps);
   const approved = proposal.status === "approved";
   const todos = useAppStore((state) =>
     approved ? state.sessionTodos[proposal.sessionId] : undefined);
   const progress = approved ? planStepProgress(steps, todos?.todos ?? []) : undefined;
   // A design section is editable only when the submitted proposal carried one;
   // plans without a design never grow one here.
-  const submittedDesign = proposal.design && !isPlanDesignEmpty(proposal.design);
+  const submittedDesign = draft?.baseDesign && !isPlanDesignEmpty(draft.baseDesign);
   return <article className="plan-document">
     <h1>{proposal.title}</h1>
     <p className="plan-overview">{proposal.question}</p>
     <section className="plan-tab-section" aria-label={t("plan.document")}>
       <h2>{t("plan.document")}</h2>
-      <div className="plan-markdown prose-chat"><Markdown source={proposal.markdown} /></div>
+      {editing ? <Suspense fallback={<div className="plan-markdown prose-chat"><Markdown source={draft.markdown} /></div>}>
+        <PlanMarkdownEditor key={draft.key} value={draft.markdown} baseMarkdown={draft.baseMarkdown} dispatch={dispatch} />
+      </Suspense> : <div className="plan-markdown prose-chat"><Markdown source={proposal.markdown} /></div>}
     </section>
     {editing && submittedDesign && draft.design
       ? <PlanDesignEditor design={draft.design} dispatch={dispatch} />
       : design && !isPlanDesignEmpty(design) && <PlanDesignView design={design} />}
-    {editing
+    {editingTasks
       ? <PlanStepsEditor draft={draft} dispatch={dispatch} />
       : !!steps.length && <PlanStepsView
         steps={steps}
         progress={progress}
         executionState={approved ? proposal.executionState : undefined}
+        onEdit={editing ? () => dispatch({ type: "tasksEdit" }) : undefined}
       />}
   </article>;
 }

@@ -104,7 +104,8 @@ test("structured revisions and plan reads never send remote requests or fall thr
   const router = createBackendRouter();
   router.registerBackend(REMOTE_SESSION_ID, backend);
   for (const action of ["approve", "reject"]) {
-    for (const revision of [{ revisedSteps: [] }, { revisedDesign: {} }, { revisedSteps: null }, { revisedDesign: null }]) {
+    for (const revision of [{ revisedSteps: [] }, { revisedDesign: {} }, { revisedSteps: null }, { revisedDesign: null }, { revisedMarkdown: "# Edited" },
+      { targetModel: { providerId: "fast", modelId: "flash" } }]) {
       await assert.rejects(router.route(IPC.invoke.plansResolve, [{
         sessionId: REMOTE_SESSION_ID, proposalId: "p", action, ...revision,
       }]), {

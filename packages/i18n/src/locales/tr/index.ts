@@ -590,8 +590,6 @@ export const tr = {
   },
   plan: {
     revise: "Planı düzenle",
-    revisePrompt:
-      "Mevcut \"{{title}}\" planını ({{path}}) düzenleyip yeni bir sürüm gönder. Değişiklikler:\n",
     build: "Oluştur",
     dependencyGraph: "Bağımlılık grafiği",
     newTask: "Yeni",
@@ -600,6 +598,11 @@ export const tr = {
     viewPlan: "Planı görüntüle",
     reviewEditPlan: "Planı incele ve düzenle",
     document: "Plan",
+    documentEditor: "Plan metnini düzenle",
+    editTasks: "Görevleri düzenle",
+    reviseEditedPrompt: "\"{{title}}\" planını ({{path}}) düzenledim. Aşağıdaki düzenlenmiş plana göre yeni bir sürüm gönder ve değiştirmediğim her şeyi koru.",
+    executionModel: "Yürütme modeli",
+    executionModelSession: "Oturum modeli · {{model}}",
     goalKind: "Hedef",
     designSpec: "Tasarım özellikleri",
     taskCount: "{{count}} görev",
@@ -676,9 +679,6 @@ export const tr = {
     graphDirectionVertical: "Dikey",
   },
   goal: {
-    revise: "Hedefi düzenle",
-    revisePrompt:
-      "Mevcut \"{{title}}\" hedefini ({{path}}) düzenleyip yeni bir sürüm gönder. Değişiklikler:\n",
     viewPlan: "Planı görüntüle",
     reviewEditPlan: "Planı incele ve düzenle",
     planning: "Hedef tanımlanıyor",

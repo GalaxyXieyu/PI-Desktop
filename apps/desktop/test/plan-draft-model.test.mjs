@@ -4,7 +4,7 @@ import test from "node:test";
 register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
 const { createPlanDraft, planDraftReducer: reduce, planDraftValidation: validate, planDraftRevision: revision, planDraftDirty: dirty } = await import("../src/features/plan/plan-draft-model.ts");
 const step = (id, dependsOn = []) => ({ id, title: id, dependsOn });
-const proposal = (extra = {}) => ({ sessionId: "s", id: "p", version: 1, steps: [step("a"), step("b", ["a"])], ...extra });
+const proposal = (extra = {}) => ({ sessionId: "s", id: "p", version: 1, status: "pending", steps: [step("a"), step("b", ["a"])], ...extra });
 const apply = (draft, type, fields = {}) => reduce(draft, { type, ...fields });
 
 test("draft starts from submitted data, is isolated, and reset restores the base", () => {
@@ -118,4 +118,30 @@ test("revision includes only normalized differences, preserving explicit clear s
   const empty = createPlanDraft(proposal({ steps: [], design: { styleKeywords: [], colorSystem: { text: [] } } }));
   assert.deepEqual(revision({ ...empty, design: {} }), {});
   assert.deepEqual(revision(createPlanDraft(proposal({ steps: undefined, design: undefined }))), {});
+});
+
+test("markdown edits travel as revisedMarkdown and reset restores the submitted body", () => {
+  const base = createPlanDraft(proposal({ markdown: "# Plan\n" }));
+  assert.equal(base.markdown, "# Plan\n");
+  let draft = apply(base, "markdownSet", { value: "# Edited\n" });
+  assert.deepEqual(revision(draft), { revisedMarkdown: "# Edited\n" });
+  assert.equal(dirty(draft), true);
+  draft = apply(draft, "markdownSet", { value: "# Plan\n" });
+  assert.deepEqual(revision(draft), {});
+  draft = apply(apply(draft, "markdownSet", { value: "# Edited\n" }), "reset");
+  assert.equal(draft.markdown, "# Plan\n");
+  assert.equal(dirty(draft), false);
+});
+
+test("a settled draft starts from the approved revision and survives execution version bumps", () => {
+  const approved = proposal({ status: "approved", version: 4, resolvedSteps: [step("a")], resolvedDesign: { framework: "vue" } });
+  const draft = createPlanDraft(approved);
+  assert.equal(draft.key, "s:p:settled");
+  assert.equal(createPlanDraft({ ...approved, version: 5 }).key, draft.key);
+  assert.deepEqual(draft.steps, [step("a")]);
+  assert.deepEqual(draft.design, { framework: "vue" });
+  const unlocked = apply(draft, "tasksEdit");
+  assert.equal(unlocked.tasksEditing, true);
+  assert.equal(dirty(unlocked), false);
+  assert.equal(apply(unlocked, "reset").tasksEditing, undefined);
 });

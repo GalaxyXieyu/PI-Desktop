@@ -588,6 +588,13 @@ the action, permission mode, and both normalized revisions equal the stored
 resolution (omitted equals NULL, not an explicit clear); any mismatch fails
 with `PLAN_APPROVAL_CONFLICT`. Execution descriptors expose only
 effective nonempty metadata. Legacy proposals omit all four fields.
+Approval also accepts `revisedMarkdown: string` for Plan; the host publishes
+it as a new artifact and the approved row's `markdown` / `artifact` describe
+that file (ADR plan-body-approval-revision). Approval (Plan or Goal) also
+accepts `targetModel: { providerId, modelId }`; the approval transaction sets
+the session's provider and model with its mode and permission. Reject with it
+or a non-string / blank id fails with `PLAN_INVALID_ARGUMENT`. A replay does
+not compare it.
 
 Shared validators return `{ ok: true, value }` or
 `{ ok: false, code, path, message }`, where message is

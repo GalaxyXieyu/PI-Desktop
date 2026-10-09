@@ -585,8 +585,6 @@ export const zhCN = {
   },
   plan: {
     revise: "修改计划",
-    revisePrompt:
-      "请基于已有计划《{{title}}》（{{path}}）修改后重新提交一版。修改要点：\n",
     build: "构建",
     dependencyGraph: "依赖图",
     newTask: "新建",
@@ -595,6 +593,11 @@ export const zhCN = {
     viewPlan: "查看/编辑计划",
     reviewEditPlan: "查看/编辑计划",
     document: "计划",
+    documentEditor: "编辑计划正文",
+    editTasks: "编辑任务",
+    reviseEditedPrompt: "我修改了计划《{{title}}》（{{path}}），请以下面修改后的内容为准重新提交一版计划，未改动的部分保持不变。",
+    executionModel: "执行模型",
+    executionModelSession: "沿用会话模型 · {{model}}",
     goalKind: "目标",
     designSpec: "设计规范",
     taskCount: "{{count}} 个任务",
@@ -671,9 +674,6 @@ export const zhCN = {
     graphDirectionVertical: "纵向",
   },
   goal: {
-    revise: "修改目标",
-    revisePrompt:
-      "请基于已有目标《{{title}}》（{{path}}）修改后重新提交一版。修改要点：\n",
     viewPlan: "查看/编辑计划",
     reviewEditPlan: "查看/编辑计划",
     planning: "正在明确目标",

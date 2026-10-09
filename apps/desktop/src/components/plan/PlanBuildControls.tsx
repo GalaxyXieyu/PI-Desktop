@@ -11,8 +11,12 @@ import { useAppStore } from "../../stores/app-store";
 import { PLAN_APPROVAL_DEFAULT_MODE } from "../../lib/plan-mode-state";
 import {
   readPlanApprovalMode,
+  readPlanExecutionModel,
   rememberPlanApprovalMode,
+  rememberPlanExecutionModel,
 } from "../../lib/plan-approval-preferences";
+import { planTargetModel, samePlanModel } from "../../features/plan/plan-execution-model";
+import { usePlanExecutionModels } from "../../features/plan/use-plan-execution-models";
 import { IconCheck, IconChevronDown } from "../icons";
 import { TooltipButton } from "../ui";
 import { AnchoredMenu } from "../settings/AnchoredMenu";
@@ -74,6 +78,17 @@ export function PlanBuildControls({
   const [approvalMode, setApprovalMode] = useState<GlobalPermissionMode>(
     readPlanApprovalMode(),
   );
+  const [executionChoice, setExecutionChoice] = useState(readPlanExecutionModel);
+  const session = useAppStore((state) => state.sessions.find((item) => item.id === proposal.sessionId));
+  const modelOptions = usePlanExecutionModels();
+  // Remote hosts own their own model configuration.
+  const executionModels = session?.source === "remote" ? [] : modelOptions;
+  const targetModel = planTargetModel(executionChoice, executionModels, session);
+  const checkedModel = targetModel
+    ? executionModels.findIndex((option) => samePlanModel(option, targetModel))
+    : -1;
+  const sessionModelLabel = executionModels.find((option) => samePlanModel(option, session))?.label
+    ?? session?.modelId ?? t("settings.defaultModel");
   const kind: ProposalKind = proposal.kind === "goal" ? "goal" : "plan";
   const copy = (name: string) => t(copyKey(kind, name));
   const isPending = proposal.status === "pending";
@@ -83,8 +98,16 @@ export function PlanBuildControls({
 
   useEffect(() => {
     setApprovalMode(readPlanApprovalMode());
+    setExecutionChoice(readPlanExecutionModel());
     setMenuOpen(false);
   }, [proposal.id]);
+
+  const chooseExecutionModel = (index: number) => {
+    const option = executionModels[index];
+    const choice = option ? { providerId: option.providerId, modelId: option.modelId } : null;
+    setExecutionChoice(choice);
+    rememberPlanExecutionModel(choice);
+  };
 
   useEffect(() => {
     setResolving(false);
@@ -117,6 +140,7 @@ export function PlanBuildControls({
               proposal,
               targetPermissionMode ?? PLAN_APPROVAL_DEFAULT_MODE,
               revision,
+              targetModel,
             )
           : buildRejectRequest(proposal),
       );
@@ -138,6 +162,14 @@ export function PlanBuildControls({
     }
     if (event.key === "Enter" || event.key === " ") {
       const target = event.target as HTMLElement;
+      const modelIndex = target.closest<HTMLButtonElement>(
+        "[data-execution-model]",
+      )?.dataset.executionModel;
+      if (modelIndex !== undefined) {
+        event.preventDefault();
+        chooseExecutionModel(Number(modelIndex));
+        return;
+      }
       const mode = target.closest<HTMLButtonElement>(
         '[data-approval-mode]',
       )?.dataset.approvalMode;
@@ -245,6 +277,45 @@ export function PlanBuildControls({
             ) : null}
           </button>
         ))}
+        {executionModels.length > 0 ? (
+          <>
+            <div className="plan-approval-menu-separator" role="separator" />
+            <div className="plan-approval-menu-heading" aria-hidden>
+              {t("plan.executionModel")}
+            </div>
+            <div
+              className="plan-approval-menu-models"
+              role="group"
+              aria-label={t("plan.executionModel")}
+              data-testid="plan-execution-models"
+            >
+              {[-1, ...executionModels.keys()].map((index) => {
+                const option = executionModels[index];
+                return (
+                  <button
+                    key={option ? `${option.providerId}:${option.modelId}` : "session"}
+                    type="button"
+                    className="plan-approval-menu-item"
+                    role="menuitemradio"
+                    aria-checked={checkedModel === index}
+                    data-execution-model={index}
+                    title={option ? `${option.providerLabel} · ${option.label}` : undefined}
+                    disabled={busy}
+                    onClick={() => chooseExecutionModel(index)}
+                  >
+                    <span>
+                      {option
+                        ? option.label
+                        : t("plan.executionModelSession", { model: sessionModelLabel })}
+                      {option ? <small>{option.providerLabel}</small> : null}
+                    </span>
+                    {checkedModel === index ? <IconCheck size={13} aria-hidden /> : null}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        ) : null}
       </AnchoredMenu>
       {buildBlocked ? (
         <p className="plan-build-error" id={errorId} role="alert">

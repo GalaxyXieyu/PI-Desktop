@@ -28,6 +28,10 @@
  * case exercises the same reducer and approval path a user drives.
  */
 import { deepStrictEqual } from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
+const BODY_EDIT = " Edited body marker.";
 
 const CHECKPOINT = {
   title: "Interactive plan UI",
@@ -506,6 +510,31 @@ export async function runInteractivePlanCase(state, h) {
   );
   await captureScreenshot(state, "plan-graph-draft");
 
+  // (e2) Type into the WYSIWYG plan body at the end of the Goal paragraph.
+  await scrollSelectorIntoView(state, '[data-testid="plan-markdown-editor"]');
+  const caret = await state.cdp.evaluate(`(() => {
+    const editor = document.querySelector('[data-testid="plan-markdown-editor"]');
+    const paragraph = [...(editor?.querySelectorAll("p") ?? [])].find((node) => node.textContent.includes("drives execution."));
+    if (!paragraph) return false;
+    editor.focus();
+    const range = document.createRange();
+    range.selectNodeContents(paragraph);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return true;
+  })()`);
+  assert(caret === true, "plan body editor or Goal paragraph missing");
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  await state.cdp.send("Input.insertText", { text: BODY_EDIT });
+  await waitFor(
+    async () => state.cdp.evaluate(`document.querySelector('[data-testid="plan-markdown-editor"]')?.textContent.includes(${JSON.stringify(BODY_EDIT.trim())})`),
+    "typed plan body edit",
+    state,
+  );
+  await captureScreenshot(state, "plan-body-edited");
+
   // (f) Build with the Ask default and verify the approved revision.
   await scrollSelectorIntoView(state, '[data-testid="plan-tab"] .plan-tab-actions');
   await clickSelector(state, '[data-testid="plan-tab"] .plan-approval-approve-menu', "plan tab approval mode menu");
@@ -544,6 +573,17 @@ export async function runInteractivePlanCase(state, h) {
   assert(
     deepEqual(proposal.resolvedDesign, EXPECTED_EDITED_DESIGN),
     `resolved design mismatch: ${json(proposal.resolvedDesign)}`,
+  );
+  assert(
+    proposal.markdown.includes(`edited in the Plan tab and that the approved revision, not the submitted one, drives execution.${BODY_EDIT}`) &&
+      proposal.artifact.relativePath !== submit.proposal.artifact.relativePath,
+    `approved body was not the edited artifact: ${json({ markdown: proposal.markdown, artifact: proposal.artifact })}`,
+  );
+  const workspacePath = (relativePath) => join(state.workspace, ...relativePath.split("/"));
+  assert(
+    await readFile(workspacePath(proposal.artifact.relativePath), "utf8") === proposal.markdown &&
+      await readFile(workspacePath(submit.proposal.artifact.relativePath), "utf8") === CHECKPOINT.markdown,
+    "edited artifact bytes or the preserved submitted artifact mismatch",
   );
 
   const todosSnapshot = await getPreloadResult(state, "todosGet", [{ sessionId }]);

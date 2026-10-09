@@ -979,12 +979,30 @@ Agent calls a permission-gated tool (including Plan/Goal Bash under Ask or Accep
    response renders a failed-closed state. A host restart interrupts pending,
    queued, and running work without replay; an already-approved interruption
    keeps the session in Agent.
-7. A settled proposal whose execution is not queued or running offers
-   **Revise plan** / **Revise goal** in its Plan tab while the session is
-   visible and idle with no pending approval. It switches the session back to
-   the contract mode when needed and seeds the composer with a request naming
-   the title and artifact path; sending it yields a new submission that
-   supersedes the settled one, which stays immutable (D648).
+7. A settled local Plan (approved, running, interrupted, completed, or
+   rejected) stays editable in its Plan tab: the body and design edit in
+   place, and the task list keeps its progress view until **Edit tasks**
+   opens the steps editor. Only once the draft differs from what executes do
+   Reset and **Revise plan** appear (D652, amending D648). Revise plan stops a
+   running execution first, switches the session back to Plan mode, and sends
+   a message with the title, artifact path, edited body, and any changed
+   tasks or design; the agent answers with a new submission for approval and
+   the settled proposal stays immutable. It is offered while the session is
+   visible, has no other pending approval, and its execution is not queued.
+   Goals and remote sessions stay read-only; a Goal is revised by typing in
+   the composer.
+8. While a local Plan is pending, its Plan tab body is a WYSIWYG editor: text,
+   lists, and table cells edit in place, Reset restores the submitted body, and
+   approving with an edited body publishes it as a new artifact the agent
+   executes (D650). Goal and remote bodies stay read-only.
+9. The Build menu (approval bar and Plan tab) lists the permission modes,
+   then an **Execution model** section: the session's model plus every model
+   the composer offers. Choosing one only selects it, is remembered across
+   proposals, and approving switches the session to it so a fast model can
+   execute what a stronger model planned (D651). Remote sessions hide the
+   section. The Plan tab header is one line: badges, title, and path
+   truncate, and Reset (icon), Reject, and Build stay on the right; under
+   420px the kind badge and title (repeated as the document heading) hide.
 
 The approval card is session-scoped. Background sessions may retain a pending
 approval or queued/running execution state in `plan_approvals`, but opening

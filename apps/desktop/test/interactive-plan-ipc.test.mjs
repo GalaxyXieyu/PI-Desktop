@@ -61,8 +61,10 @@ function harness() {
 test("approval forwards normalized revisions and retains effective metadata for dispatch", async () => {
   const { resolve, calls, dispatched } = harness();
   await resolve({ ...legacy, revisedSteps: [{ id: " first ", title: " First ", detail: " " }],
-    revisedDesign: { framework: " REACT ", colorSystem: { primary: ["#aabbcc"] } }, extra: true });
-  assert.deepEqual(calls, [{ method: "plans.resolve", params: { ...legacy, revisedSteps: steps, revisedDesign: design } }]);
+    revisedDesign: { framework: " REACT ", colorSystem: { primary: ["#aabbcc"] } }, revisedMarkdown: "# Edited\n",
+    targetModel: { providerId: " fast ", modelId: " flash " }, extra: true });
+  assert.deepEqual(calls, [{ method: "plans.resolve", params: { ...legacy, revisedSteps: steps, revisedDesign: design,
+    revisedMarkdown: "# Edited\n", targetModel: { providerId: "fast", modelId: "flash" } } }]);
   assert.deepEqual(dispatched, [execution]);
 });
 
@@ -90,8 +92,12 @@ test("invalid and rejected revisions fail before any host call", async () => {
     [{ revisedSteps: [{ id: "x", title: "X", dependsOn: ["x"] }] }, "PLAN_STEPS_INVALID"],
     [{ revisedDesign: { colorSystem: { text: ["red"] } } }, "PLAN_DESIGN_INVALID"],
     [{ revisedDesign: null }, "PLAN_DESIGN_INVALID"],
+    [{ revisedMarkdown: 42 }, "PLAN_INVALID_ARGUMENT"],
+    [{ targetModel: { providerId: "fast" } }, "PLAN_INVALID_ARGUMENT"],
+    [{ targetModel: null }, "PLAN_INVALID_ARGUMENT"],
   ]) await assert.rejects(resolve({ ...legacy, ...revision }), { errorCode: code });
-  for (const revision of [{ revisedSteps: [] }, { revisedDesign: {} }, { revisedSteps: null }]) {
+  for (const revision of [{ revisedSteps: [] }, { revisedDesign: {} }, { revisedSteps: null }, { revisedMarkdown: "# Edited" },
+    { targetModel: { providerId: "fast", modelId: "flash" } }]) {
     await assert.rejects(resolve({ ...legacy, action: "reject", ...revision }), { errorCode: "PLAN_INVALID_ARGUMENT" });
   }
   assert.deepEqual(calls, []);

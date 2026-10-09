@@ -321,7 +321,12 @@ export function createRemoteBackend(options: RemoteBackendOptions): RemoteBacken
       }
       case IPC.invoke.plansResolve: {
         const resolution = args[0] as PlanResolveRequest;
-        if (resolution.revisedSteps !== undefined || resolution.revisedDesign !== undefined) {
+        if (
+          resolution.revisedSteps !== undefined ||
+          resolution.revisedDesign !== undefined ||
+          resolution.revisedMarkdown !== undefined ||
+          resolution.targetModel !== undefined
+        ) {
           throw Object.assign(new Error("Structured plan revisions are not supported for remote sessions"), {
             errorCode: ErrorCodes.PLAN_REVISION_UNSUPPORTED,
           });

@@ -3,6 +3,7 @@
 - Status: Accepted for implementation
 - Date: 2026-10-04
 - Amends: ADR 0053, ADR 0312
+- Amended by: ADR plan-body-approval-revision (approval may also revise the Markdown body)
 - Related: ADR 0053, ADR 0312, ADR 0124
 - Protocol: v12
 - Storage schema: v22

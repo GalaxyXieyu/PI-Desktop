@@ -38,12 +38,16 @@ test("approve request carries revisedSteps only when the draft steps changed", (
   const designOnly = buildApproveRequest(base, "accept-edits", planDraftRevision(designed));
   assert.ok(!("revisedSteps" in designOnly));
   assert.deepEqual(designOnly.revisedDesign, { framework: "vue" });
+  assert.ok(!("revisedMarkdown" in designOnly));
+  const rewritten = planDraftReducer(draft, { type: "markdownSet", value: "# Rewritten\n" });
+  assert.equal(buildApproveRequest(base, "ask", planDraftRevision(rewritten)).revisedMarkdown, "# Rewritten\n");
 });
 
 test("approve request never carries a revision for goal proposals or remote sessions", () => {
-  const revision = { revisedSteps: [{ id: "x", title: "X", dependsOn: [] }] };
+  const revision = { revisedSteps: [{ id: "x", title: "X", dependsOn: [] }], revisedMarkdown: "# X\n" };
   const goalRequest = buildApproveRequest(goal, "ask", revision);
   assert.ok(!("revisedSteps" in goalRequest));
+  assert.ok(!("revisedMarkdown" in goalRequest));
   assert.ok(!("revisedDesign" in goalRequest));
   // Remote sessions pass no revision at all (structure editing is local-only).
   const remoteRequest = buildApproveRequest(base, "ask");
@@ -60,4 +64,48 @@ test("step title keyboard contract: Enter saves, Escape cancels, Backspace remov
   assert.equal(planStepEditKeyAction("Backspace", "x"), null);
   assert.equal(planStepEditKeyAction("Delete", ""), null);
   assert.equal(planStepEditKeyAction("a", ""), null);
+});
+
+const { planExecutionModelOptions, planTargetModel } = await import("../src/features/plan/plan-execution-model.ts");
+const { readPlanExecutionModel, rememberPlanExecutionModel } = await import("../src/lib/plan-approval-preferences.ts");
+
+test("approve request carries the chosen execution model for plans and goals", () => {
+  const fast = { providerId: "fast", modelId: "flash" };
+  assert.deepEqual(buildApproveRequest(base, "ask", undefined, fast).targetModel, fast);
+  assert.deepEqual(buildApproveRequest(goal, "ask", undefined, fast).targetModel, fast);
+  assert.ok(!("targetModel" in buildApproveRequest(base, "ask")));
+});
+
+test("execution model options follow composer availability and skip the session model", () => {
+  const provider = (id, extra) => ({ id, name: id, enabled: true, hasSecret: true, authKind: "api-key",
+    models: [{ id: `${id}-m` }], ...extra });
+  const options = planExecutionModelOptions([
+    provider("fast"), provider("off", { enabled: false }), provider("nokey", { hasSecret: false }),
+  ]);
+  assert.deepEqual(options.map(({ providerId, modelId }) => `${providerId}/${modelId}`), ["fast/fast-m"]);
+  const fast = { providerId: "fast", modelId: "fast-m" };
+  assert.deepEqual(planTargetModel(fast, options, { providerId: "slow", modelId: "big" }), fast);
+  assert.equal(planTargetModel(fast, options, fast), undefined);
+  assert.equal(planTargetModel({ providerId: "gone", modelId: "x" }, options, undefined), undefined);
+  assert.equal(planTargetModel(null, options, undefined), undefined);
+});
+
+test("execution model preference round-trips and ignores malformed storage", () => {
+  const values = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key),
+  };
+  try {
+    assert.equal(readPlanExecutionModel(), null);
+    rememberPlanExecutionModel({ providerId: "fast", modelId: "flash" });
+    assert.deepEqual(readPlanExecutionModel(), { providerId: "fast", modelId: "flash" });
+    rememberPlanExecutionModel(null);
+    assert.equal(readPlanExecutionModel(), null);
+    values.set("pi.desktop.planExecutionModel", "{broken");
+    assert.equal(readPlanExecutionModel(), null);
+  } finally {
+    delete globalThis.localStorage;
+  }
 });
