@@ -6,7 +6,7 @@
 - Amended by: ADR plan-body-approval-revision (approval may also revise the Markdown body)
 - Related: ADR 0053, ADR 0312, ADR 0124
 - Protocol: v12
-- Storage schema: v22
+- Storage schema: v23
 
 ## Context
 
@@ -174,13 +174,15 @@ project workspace (ADR 0124); metadata does not broaden that boundary.
 
 ### 6. Versioning
 
-Protocol v12 and storage schema v22 bump together, as one change. The
+Protocol v12 and storage schema v23 carry the Interactive Plan change. The
 handshake still requires exact version equality, so a mixed v11/v12 pair
 refuses to boot instead of silently dropping the approved structure. Schema
-v22 adds the four `plan_approvals` columns and `session_todo.step_id` in one
-backed-up, transactional, idempotent v21→v22 migration (`pi.sqlite.v21.bak`,
-column probes, `PRAGMA user_version = 22` last); the v20→v21→v22 chain
-remains supported.
+v23 adds the four `plan_approvals` columns and `session_todo.step_id` in one
+backed-up, transactional, idempotent v22→v23 migration (`pi.sqlite.v22.bak`,
+column probes, `PRAGMA user_version = 23` last); the v20→v21→v22→v23 chain
+remains supported. Upstream v22 owns the session-list index migration. Early
+dev builds also used v22 for plan columns, so v23 preserves their metadata
+and idempotently applies the upstream index replacement as well.
 
 ## Explicitly not done
 

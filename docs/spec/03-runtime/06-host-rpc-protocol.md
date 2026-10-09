@@ -174,7 +174,7 @@ Rules:
 10. Version 12 adds Interactive Plan metadata and approval revisions. A v11
     peer is rejected rather than silently dropping the approved structure.
 
-Protocol v12 adds Interactive Plan storage schema v22 (following v21).
+Protocol v12 adds Interactive Plan storage schema v23 (following the v22 session-list index).
 Earlier schema history: schema v12 had added
 the A2A tables (`a2a_tasks`, `a2a_messages`, `a2a_artifacts`,
 `a2a_push_configs`) via `migrate_v11_to_v12`; `migrate_v12_to_v13` drops those
