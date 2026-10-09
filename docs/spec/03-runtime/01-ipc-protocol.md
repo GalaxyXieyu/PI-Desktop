@@ -2269,6 +2269,14 @@ POST transport; GET is handled with 405 because this server does not offer an
 SSE stream. Clients poll `pi_session_get` or `pi_agent_status` for turn
 progress.
 
+The reviewed read operation `agent/pendingInteractive` accepts one positional
+argument `{ sessionId: string }` through `pi_desktop_invoke`. An explicit,
+non-empty session is required by the existing IPC handler. It returns the
+Host-owned `asks` and `permissions` arrays, retaining request IDs and display
+metadata for the existing response operations. Native Pi sessions return empty
+arrays; this is not a new input path for those sessions. Reads do not refresh
+the renderer. No permission-mode change or automatic approval is performed.
+
 ### Connection and authentication
 
 The server creates a 256-bit random bearer token on first use and stores it in

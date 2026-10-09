@@ -206,6 +206,7 @@ const CONTROL_OPERATION_SPECS: OperationSpec[] = [
   spec("agentAbort", "agent/abort", "Abort an active Agent turn.", "write", ["request"]),
   spec("agentStop", "agent/stop", "Request a graceful Agent stop.", "write", ["request"]),
   spec("agentGetStatus", "agent/getStatus", "Read Agent runtime status.", "read", ["sessionId"]),
+  spec("pendingInteractive", "agent/pendingInteractive", "Read pending tool permissions and questions for one explicit session.", "read", ["{ sessionId: string }"]),
   spec("sessionList", "session/list", "List durable sessions.", "read", []),
   spec("sessionCreate", "session/create", "Create a durable session.", "write", ["input"]),
   spec("sessionFork", "session/fork", "Fork a session.", "write", ["input"]),

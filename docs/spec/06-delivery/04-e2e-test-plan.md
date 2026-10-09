@@ -13828,6 +13828,14 @@ are withdrawn with ADR 0165.
 
 #### E2E-220: Local MCP control drives a running desktop
 
+- **Pending-input extension:** In an isolated fixture session, discover the read
+  operation `agent/pendingInteractive`, read `{ sessionId }`, and verify original
+  question/permission request IDs and details. Resolve through existing confirmed
+  operations, refresh, and verify no stale card remains. Missing session identity
+  fails; native Pi sessions return empty arrays; reads cause no renderer mutation.
+  The HTTP/catalog path is covered by `mcp-control.test.mjs`; real Electron and
+  sidecar approval execution remains a separate acceptance check.
+
 - **Preconditions**: Start PI-Desktop with
   `PI_DESKTOP_MCP_CONTROL=1` and a clean profile. A local project directory is
   available, the Electron user-data directory is writable, and the desktop
