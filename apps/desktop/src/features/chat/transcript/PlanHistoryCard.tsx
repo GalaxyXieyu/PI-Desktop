@@ -4,7 +4,7 @@ import type { PlanProposal, UiMessage } from "@pi-desktop/shared";
 import { Badge, Button, Panel } from "../../../components/ui";
 import { Markdown } from "../../../components/Markdown";
 import { useAppStore } from "../../../stores/app-store";
-import { planWorkPanelTab, preferredFileWorkPanelTab } from "../../../lib/work-panel-tabs";
+import { planWorkPanelTab } from "../../../lib/work-panel-tabs";
 import { useSlotSessionId } from "../../../plugins/renderer-slots/use-slots";
 import { disclosureKey, useAutomaticDisclosure } from "./disclosure";
 import { useMessageRevealRequest } from "./shared";
@@ -19,8 +19,8 @@ export function PlanHistoryCard({ message, proposal, autoOpen = false, onUserInt
   const reveal = useMessageRevealRequest(message.id);
   const disclosure = useAutomaticDisclosure(autoOpen, reveal, disclosureKey("tool", message.id));
   const openTab = useAppStore(state => state.openWorkPanelTabForSession);
-  const views = useAppStore(state => state.pluginViews);
   const sessionId = useSlotSessionId() || proposal.sessionId;
+  const openPlan = () => { onUserInteraction?.(); openTab(sessionId, planWorkPanelTab(proposal)); };
   const path = proposal.artifact?.relativePath;
   const status = message.planHistory?.proposal.status ?? "unknown";
   const statusKey = ["pending", "approved", "rejected", "expired", "interrupted"].includes(status) ? status : "unknown";
@@ -38,13 +38,13 @@ export function PlanHistoryCard({ message, proposal, autoOpen = false, onUserInt
       {message.planHistory?.superseded && <Badge>{t("planHistory.superseded")}</Badge>}
       {proposal.kind !== "goal" && message.toolName === "SubmitPlan" && <Button variant="ghost" size="sm"
         className="plan-history-view-plan" data-testid="plan-tool-view-plan"
-        onClick={() => { onUserInteraction?.(); openTab(sessionId, planWorkPanelTab(proposal)); }}>
+        onClick={openPlan}>
         {t("plan.viewPlan")}
       </Button>}
     </div>
     {path && <Button variant="ghost" className="plan-history-artifact"
       aria-label={t(`${kind}.openArtifactLabel`, { path })}
-      onClick={() => { onUserInteraction?.(); openTab(sessionId, preferredFileWorkPanelTab(path, views)); }}>
+      onClick={openPlan}>
       {path}
     </Button>}
     {disclosure.open && <div id={bodyId} className="plan-history-body">

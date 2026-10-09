@@ -963,9 +963,9 @@ Agent calls a permission-gated tool (including Plan/Goal Bash under Ask or Accep
    `.pi/plan/*.md` or `.pi/goal/*.md` artifact, records its path/hash/size and structured
    title/question, and the renderer displays the shared contract approval card with
    only the title and artifact opener; the question remains host-side contract data.
-   The opener hands that path to the bundled file view when it is launchable and to
-   the host file tab otherwise, so the artifact opens beside the conversation in the
-   same view the user's other project files use (D452).
+   The opener, and any chat link that resolves to the artifact, opens the proposal's
+   structured Plan tab beside the conversation (D647); the Plan tab's own artifact
+   button still hands the raw file to the bundled file view or the host file tab (D452).
 4. Approve requires Ask / Accept edits / Auto selection. The renderer remembers
    the last selected mode on this device and uses it as the next approval's
    default. Host-core commits the approval, `mode = agent`, permission mode,
@@ -979,6 +979,12 @@ Agent calls a permission-gated tool (including Plan/Goal Bash under Ask or Accep
    response renders a failed-closed state. A host restart interrupts pending,
    queued, and running work without replay; an already-approved interruption
    keeps the session in Agent.
+7. A settled proposal whose execution is not queued or running offers
+   **Revise plan** / **Revise goal** in its Plan tab while the session is
+   visible and idle with no pending approval. It switches the session back to
+   the contract mode when needed and seeds the composer with a request naming
+   the title and artifact path; sending it yields a new submission that
+   supersedes the settled one, which stays immutable (D648).
 
 The approval card is session-scoped. Background sessions may retain a pending
 approval or queued/running execution state in `plan_approvals`, but opening
@@ -986,9 +992,12 @@ another session never covers it or moves focus; returning to the originating
   session restores the renderer-lifetime snapshot; while the host remains alive,
   `plans.pending` can rehydrate a still-pending row. The approval card does not
   expose a validity/deadline concept.
-Mode/provider/model/permission/shell configuration and new prompts remain
-disabled while an active `pending` approval or turn exists. During pending
-approval the existing draft remains in the textarea but is read-only; only
+Mode/provider/model/permission/shell configuration remains disabled while an
+active `pending` approval or turn exists. During pending approval the textarea
+stays editable and its placeholder says that sending is feedback: submitting a
+message first rejects the pending proposal through the normal `plans.resolve`
+reject, then sends the message as the next prompt (queued behind the stopping
+turn when needed); a refused reject keeps the draft and sends nothing (D649).
 Approve and Reject remain enabled on the approval surface. Reject, expiry, or
 interruption re-enables them; terminal proposal snapshots do not keep the gate
 closed. The renderer retains the latest checkpoint/execution status per session

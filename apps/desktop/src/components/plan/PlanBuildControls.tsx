@@ -6,7 +6,7 @@ import type {
   PlanProposal,
   ProposalKind,
 } from "@pi-desktop/shared";
-import { buildApproveRequest, type PlanRevision } from "../../features/plan/plan-draft-model";
+import { buildApproveRequest, buildRejectRequest, type PlanRevision } from "../../features/plan/plan-draft-model";
 import { useAppStore } from "../../stores/app-store";
 import { PLAN_APPROVAL_DEFAULT_MODE } from "../../lib/plan-mode-state";
 import {
@@ -111,13 +111,6 @@ export function PlanBuildControls({
     }
     setResolving(true);
     try {
-      const identity = {
-        proposalId: proposal.id,
-        sessionId: proposal.sessionId,
-        turnId: proposal.turnId,
-        toolCallId: proposal.toolCallId,
-        version: proposal.version,
-      };
       await resolvePlan(
         action === "approve"
           ? buildApproveRequest(
@@ -125,7 +118,7 @@ export function PlanBuildControls({
               targetPermissionMode ?? PLAN_APPROVAL_DEFAULT_MODE,
               revision,
             )
-          : { ...identity, action },
+          : buildRejectRequest(proposal),
       );
       focusComposer();
     } catch (error) {

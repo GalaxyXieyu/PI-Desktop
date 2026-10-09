@@ -18,7 +18,7 @@ import {
   type ProjectMeta,
   type SessionMeta,
 } from "../../lib/sidebar-preferences";
-import { preferredFileWorkPanelTab } from "../../lib/work-panel-tabs";
+import { planWorkPanelTab } from "../../lib/work-panel-tabs";
 import type { AppState } from "../app-state";
 
 export function promptAttachmentsFromDraft(
@@ -118,17 +118,12 @@ export function sessionModeForPlanningState(
   return modeForProposalKind(kind ?? "plan");
 }
 
-export function openPlanArtifact(
+/** Reveal a proposal for review in its structured Plan tab. */
+export function openPlanReview(
   proposal: PlanProposal,
   openWorkPanelTabForSession: AppState["openWorkPanelTabForSession"],
-  pluginViews: AppState["pluginViews"],
 ) {
-  const relativePath = proposal.artifact?.relativePath;
-  if (!relativePath) return;
-  openWorkPanelTabForSession(
-    proposal.sessionId,
-    preferredFileWorkPanelTab(relativePath, pluginViews),
-  );
+  openWorkPanelTabForSession(proposal.sessionId, planWorkPanelTab(proposal));
 }
 
 export function decorateSessions(

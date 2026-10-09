@@ -238,6 +238,7 @@ export const ko = {
     sessionMissing: "해당 세션이 더 이상 존재하지 않습니다",
   },
   chat: {
+    planFeedbackPlaceholder: "수정 의견을 입력하세요. 보내면 현재 계획이 거부됩니다",
     tableActions: "표 작업",
     markdownPlainTextFallback: "긴 응답은 화면의 반응성을 유지하기 위해 일반 텍스트로 표시됩니다.",
     largeTextPageControls: "대용량 출력 페이지",
@@ -592,6 +593,9 @@ export const ko = {
     superseded: "새 버전으로 대체됨",
   },
   plan: {
+    revise: "계획 수정",
+    revisePrompt:
+      "기존 계획 \"{{title}}\"({{path}})을 수정해 새 버전으로 다시 제출해 주세요. 변경 사항:\n",
     build: "빌드",
     dependencyGraph: "의존성 그래프",
     newTask: "새 작업",
@@ -623,7 +627,6 @@ export const ko = {
     stepTitleLabel: "작업 제목",
     untitledStep: "제목 없는 작업",
     addDetail: "세부 정보 추가",
-    hideDetail: "세부 정보 숨기기",
     stepDetailLabel: "작업 세부 정보",
     stepDetailPlaceholder: "이 작업의 선택적 세부 정보",
     wouldCreateCycle: "순환 참조가 발생합니다",
@@ -677,6 +680,9 @@ export const ko = {
     graphDirectionVertical: "세로",
   },
   goal: {
+    revise: "목표 수정",
+    revisePrompt:
+      "기존 목표 \"{{title}}\"({{path}})을 수정해 새 버전으로 다시 제출해 주세요. 변경 사항:\n",
     viewPlan: "계획 보기",
     reviewEditPlan: "계획 검토 및 편집",
     planning: "목표 정의 중",

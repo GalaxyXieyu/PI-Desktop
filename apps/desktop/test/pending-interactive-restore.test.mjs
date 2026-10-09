@@ -64,7 +64,7 @@ function harness({ sessions = DEFAULT_SESSIONS, pendingAsks = {}, pendingPermiss
     withoutRecordKey: (record, key) =>
       Object.fromEntries(Object.entries(record).filter(([id]) => id !== key)),
     sessionModeForPlanningState: () => "agent",
-    openPlanArtifact: () => {},
+    openPlanReview: () => {},
     rememberSessionCompactions: () => {},
     commitForkedSession: () => {},
     persistSessionAndSelect: async () => null,

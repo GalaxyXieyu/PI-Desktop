@@ -7102,8 +7102,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Steps**: 1) Let the Agent call `SubmitPlan` with fixed title, Markdown, and
   question. 2) Inspect the new `.pi/plan/*.md` file byte-for-byte and the
   `plan_approvals` row. 3) Inspect the card's title and artifact opener; confirm
-  the opener uses the bundled file view when it is launchable and the host
-  file tab otherwise (D452), and that the question/description,
+  the opener reveals the proposal's structured `plan:<id>` tab (D647), whose
+  own artifact button uses the bundled file view when it is launchable and the
+  host file tab otherwise (D452), and that the question/description,
   validity/deadline, and status are absent with only Approve and Reject
   offered. 4) Open the approval mode menu, choose Auto,
   and verify the next approval defaults to Auto. 5) Reject the
@@ -7115,8 +7116,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   unique artifact, records its relative path/hash/size with structured
   title/question, and never lets the renderer or sidecar write or replace it.
   The title-derived artifact filename is recognizable from the title, including
-  non-ASCII title characters. The card shows the title and opens the artifact in
-  the bundled file view, falling back to the host file tab when that view is not
+  non-ASCII title characters. The card shows the title and opens the proposal's
+  structured Plan tab (D647); the raw artifact opens from that tab in the
+  bundled file view, falling back to the host file tab when that view is not
   launchable (D452);
   it does not require inline question/Markdown/hash/size or a validity/deadline
   indicator. The selected approval mode is remembered locally for the next

@@ -17,6 +17,7 @@ import { planStepProgress, type PlanProgress } from "../../features/plan/plan-st
 import { PlanDesignEditor } from "./PlanDesignEditor";
 import { PlanStepsEditor } from "./PlanStepsEditor";
 import { PlanTasksSection } from "./PlanFlowchart";
+import { PlanStepDeps } from "./PlanStepDeps";
 
 export function PlanDesignView({ design }: { design: PlanDesignSpec }) {
   const { t } = useTranslation();
@@ -129,7 +130,6 @@ export function PlanStepsView({
   executionState?: PlanExecutionState;
 }) {
   const { t } = useTranslation();
-  const byId = new Map(steps.map((step, index) => [step.id, { step, index }]));
   const statusByStepId = new Map(progress?.steps.map((step) => [step.stepId, step.status]) ?? []);
   return <PlanTasksSection steps={steps} progress={progress} summary={
     progress && <p className="plan-progress" data-testid="plan-progress">
@@ -139,30 +139,26 @@ export function PlanStepsView({
       </Badge>}
     </p>
   }>
-    <ol className="plan-task-list">{steps.map((step) => {
+    <ol className="plan-task-list">{steps.map((step, index) => {
       const status = statusByStepId.get(step.id);
       const shown = !status || status === "unknown" ? "pending" : status;
       return <li key={step.id}
+        className={cx("plan-step-row", progress && `plan-step-row--${shown}`)}
         data-testid={progress ? "plan-progress-step" : undefined}
         data-step-id={step.id}
         data-status={progress ? shown : undefined}
       >
         <div className="plan-step-line">
-          {progress && <span
+          {progress ? <span
             className={cx("plan-step-status", `plan-step-status--${shown}`)}
             role="img"
             aria-label={t(`plan.stepStatus.${shown === "in_progress" ? "inProgress" : shown}`)}
-          >{STEP_STATUS_GLYPHS[shown]}</span>}
-          <strong>{step.title}</strong>
+          >{STEP_STATUS_GLYPHS[shown]}</span> : <span className="plan-step-status" aria-hidden />}
+          <span className="plan-step-index">{index + 1}</span>
+          <span className="plan-step-title">{step.title}</span>
+          <PlanStepDeps step={step} steps={steps} />
         </div>
         {step.detail && <p className="plan-task-detail">{step.detail}</p>}
-        {!!step.dependsOn.length && <div className="plan-tab-chips" data-testid="plan-step-deps">
-          <span className="plan-tab-muted">{t("plan.dependsOn")}</span>
-          {step.dependsOn.map((id) => {
-            const dependency = byId.get(id);
-            return dependency ? <Badge key={id}>{dependency.index + 1}. {dependency.step.title}</Badge> : null;
-          })}
-        </div>}
       </li>;
     })}</ol>
   </PlanTasksSection>;
@@ -198,7 +194,7 @@ export function PlanDocument({
     <p className="plan-overview">{proposal.question}</p>
     <section className="plan-tab-section" aria-label={t("plan.document")}>
       <h2>{t("plan.document")}</h2>
-      <Markdown source={proposal.markdown} />
+      <div className="plan-markdown prose-chat"><Markdown source={proposal.markdown} /></div>
     </section>
     {editing && submittedDesign && draft.design
       ? <PlanDesignEditor design={draft.design} dispatch={dispatch} />

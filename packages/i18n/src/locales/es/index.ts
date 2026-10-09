@@ -229,6 +229,7 @@ export const es = {
     sessionMissing: "Esa sesión ya no existe",
   },
   "chat": {
+    planFeedbackPlaceholder: "Escribe los cambios como comentario; enviar rechaza este plan",
     "tableActions": "Acciones de tabla",
     "markdownPlainTextFallback": "La respuesta extensa se muestra como texto sin formato para mantener la fluidez.",
     "largeTextPageControls": "Páginas de la salida extensa",
@@ -583,6 +584,9 @@ export const es = {
     superseded: "Sustituido",
   },
   "plan": {
+    revise: "Revisar plan",
+    revisePrompt:
+      "Revisa el plan existente \"{{title}}\" ({{path}}) y envía una nueva versión. Cambios:\n",
     build: "Construir",
     dependencyGraph: "Grafo de dependencias",
     newTask: "Nueva",
@@ -614,7 +618,6 @@ export const es = {
     stepTitleLabel: "Título de la tarea",
     untitledStep: "Tarea sin título",
     addDetail: "Añadir detalle",
-    hideDetail: "Ocultar detalle",
     stepDetailLabel: "Detalle de la tarea",
     stepDetailPlaceholder: "Detalle opcional de esta tarea",
     wouldCreateCycle: "Crearía un ciclo",
@@ -668,6 +671,9 @@ export const es = {
     "graphDirectionVertical": "Vertical",
   },
   "goal": {
+    revise: "Revisar objetivo",
+    revisePrompt:
+      "Revisa el objetivo existente \"{{title}}\" ({{path}}) y envía una nueva versión. Cambios:\n",
     viewPlan: "Ver plan",
     reviewEditPlan: "Revisar y editar plan",
     "planning": "Definición de meta",

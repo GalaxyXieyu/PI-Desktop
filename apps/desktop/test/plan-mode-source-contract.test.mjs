@@ -147,17 +147,18 @@ test("the component spec assigns mode ownership to Composer", () => {
 });
 
 test("plan approval sends exact identities and waits for host confirmation", () => {
-  assert.match(planControlsSource, /proposalId: proposal\.id/);
-  assert.match(planControlsSource, /sessionId: proposal\.sessionId/);
-  assert.match(planControlsSource, /turnId: proposal\.turnId/);
-  assert.match(planControlsSource, /toolCallId: proposal\.toolCallId/);
-  assert.match(planControlsSource, /version: proposal\.version/);
-  // The approve half is built by the shared draft-model helper so the bar and
-  // the tab cannot drift; reject stays an inline identity-only request.
+  assert.match(planDraftModelSource, /proposalId: proposal\.id/);
+  assert.match(planDraftModelSource, /sessionId: proposal\.sessionId/);
+  assert.match(planDraftModelSource, /turnId: proposal\.turnId/);
+  assert.match(planDraftModelSource, /toolCallId: proposal\.toolCallId/);
+  assert.match(planDraftModelSource, /version: proposal\.version/);
+  // Both halves come from the shared draft-model helpers so the bar, the tab,
+  // and composer feedback cannot drift.
   assert.match(
     planControlsSource,
-    /action === "approve"\s*\?\s*buildApproveRequest\([\s\S]*?\)\s*:\s*\{[\s\S]*?\.\.\.identity,\s*action\s*\}/,
+    /action === "approve"\s*\?\s*buildApproveRequest\([\s\S]*?\)\s*:\s*buildRejectRequest\(proposal\)/,
   );
+  assert.match(planDraftModelSource, /\.\.\.proposalIdentity\(proposal\), action: "reject"/);
   assert.match(planDraftModelSource, /targetPermissionMode: mode/);
   assert.match(planDraftModelSource, /proposal\.kind === "plan" \? revision : undefined/);
   assert.doesNotMatch(planControlsSource, /request_changes/);
@@ -172,11 +173,9 @@ test("plan approval sends exact identities and waits for host confirmation", () 
   assert.match(transcriptSource, /pendingPlans\[sessionId\]\?\.status === "pending"/);
   assert.doesNotMatch(transcriptSource, /PlanApprovalCard|plan-approval-card/);
   assert.doesNotMatch(transcriptSource, /\bpendingPlan\b/);
-  assert.match(storeSource, /openPlanArtifact/);
-  assert.match(
-    storeSource,
-    /preferredFileWorkPanelTab\(relativePath, pluginViews\)/,
-  );
+  assert.match(storeSource, /openPlanReview/);
+  assert.match(storeSource, /planWorkPanelTab\(proposal\)/);
+  assert.doesNotMatch(storeSource, /preferredFileWorkPanelTab/);
   assert.match(planControlsSource, /const isPending = proposal\.status === "pending"/);
   const resolveBlock = interactionSource.slice(interactionSource.indexOf("resolvePlan: async"));
   assert.match(resolveBlock, /await api\.resolvePlan\(resolution\)/);
@@ -184,38 +183,6 @@ test("plan approval sends exact identities and waits for host confirmation", () 
   assert.doesNotMatch(resolveBlock, /planApprovalPermissionMode/);
   assert.doesNotMatch(storeSource, /planApprovalPermissionMode/);
   assert.doesNotMatch(resolveBlock, /finally[\s\S]*pendingPlans/);
-});
-
-test("the startup artifact restore resolves launchable views first", () => {
-  // The artifact's surface comes from the launchable plugin views, and the
-  // renderer only reads that list after `ready`. Opening the artifact before
-  // that read used the host file tab and then took a second tab when
-  // `selectSession` restored the same approval.
-  const bootstrapStart = storeSource.indexOf("bootstrap: async");
-  assert.ok(bootstrapStart > -1, "bootstrap is declared in the store source");
-  const bootstrap = storeSource.slice(bootstrapStart);
-  const resolvedViews = bootstrap.indexOf("await get().refreshPluginViews();");
-  // The same loop shape also runs once before the restore, so search from the
-  // refresh rather than from the top of `bootstrap`.
-  const restoreLoop = bootstrap.indexOf(
-    "for (const proposal of activePendingPlans)",
-    resolvedViews,
-  );
-
-  assert.ok(resolvedViews > -1, "bootstrap resolves the launchable views");
-  assert.ok(
-    restoreLoop > resolvedViews,
-    "the view list resolves before the pending-plan restore loop",
-  );
-  assert.ok(
-    bootstrap.indexOf("openPlanArtifact(", resolvedViews) > restoreLoop,
-    "no artifact opens before that loop",
-  );
-  // Every slice call site forwards the live list, so a stub list cannot hide
-  // the wrong surface behind a green run.
-  for (const slice of [eventsSource, sessionSource]) {
-    assert.match(slice, /openPlanArtifact\([\s\S]{0,120}?get\(\)\.pluginViews/);
-  }
 });
 
 test("plan approval bar paints the composer plate over the transparent dock", () => {
@@ -246,13 +213,14 @@ test("mode commands configure the active session instead of only changing defaul
   assert.match(modeCommandBlock, /else if \(store\.settings\)/);
 });
 
-test("pending approval keeps the draft while gating every composer control", () => {
+test("pending approval keeps typing open while gating every configuration control", () => {
   assert.match(composerSource, /contentEditable=\{!inputBlocked\}/);
   assert.match(composerSource, /aria-readonly=\{inputBlocked\}/);
   assert.match(composerSource, /enabled: !inputBlocked/);
   assert.match(composerSource, /disabled=\{controlsBlocked\}/);
   assert.match(composerSource, /const controlsBlocked = approvalPending \|\| nativeSession;/);
-  assert.match(composerSource, /const sendBlocked = approvalPending \|\| pasting \|\| nativeInputBlocked;/);
+  assert.match(composerSource, /const sendBlocked = pasting \|\| nativeInputBlocked;/);
+  assert.match(composerSource, /approvalPending \? "chat\.planFeedbackPlaceholder"/);
   assert.match(storeSource, /if \(get\(\)\.pendingPlans\[sessionId\]\?\.status === "pending"\) return/);
 });
 

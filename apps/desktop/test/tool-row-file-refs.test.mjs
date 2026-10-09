@@ -48,9 +48,13 @@ const state = {
   workspace: { path: "C:/project" },
   activeSessionId: "session-1",
   pluginViews: [],
+  pendingPlans: {},
+  planCheckpoints: {},
+  messages: [],
   openFileInWorkPanel: (...args) => calls.files.push(args),
   openUrlInWorkPanel: (...args) => calls.urls.push(args),
   openWorkPanelTab: (tab) => calls.tabs.push(tab),
+  openWorkPanelTabForSession: (sessionId, tab) => calls.tabs.push({ sessionId, ...tab }),
   showToast: (...args) => calls.toasts.push(args),
 };
 
@@ -63,7 +67,10 @@ const workPanelTabs = loadModule("../src/lib/work-panel-tabs.ts", {});
 const { useOpenPreviewTarget } = loadModule("../src/hooks/use-preview-target.ts", {
   react: React,
   "react-i18next": { useTranslation: () => ({ t: (key, values) => `${key}:${values?.name ?? ""}` }) },
-  "../stores/app-store": { useAppStore: (selector) => selector(state) },
+  "../stores/app-store": {
+    useAppStore: Object.assign((selector) => selector(state), { getState: () => state }),
+  },
+  "../features/plan/plan-artifact-link": loadModule("../src/features/plan/plan-artifact-link.ts", {}),
   "../lib/api": {
     api: {
       fsResolveRef: async (ref) => {
@@ -91,6 +98,7 @@ function reset({ pluginView = false } = {}) {
   state.pluginViews = pluginView
     ? [{ pluginId: "pi.file-manager", viewId: "manager" }]
     : [];
+  state.pendingPlans = {};
   nextMatch = null;
   nextReason = null;
   resolveFails = false;
@@ -141,6 +149,19 @@ test("a project file a tool surface names opens in the bundled file view", async
   ]);
   assert.deepEqual(calls.files, [], "the host file tab is not also opened");
   assert.deepEqual(calls.toasts, []);
+});
+
+test("a project file that is a plan artifact opens the structured Plan tab", async () => {
+  reset({ pluginView: true });
+  state.pendingPlans = {
+    "session-1": { id: "p1", sessionId: "session-1", title: "Ship", artifact: { relativePath: ".pi/plan/p1.md" } },
+  };
+  nextMatch = projectMatch({ relativePath: ".pi/plan/p1.md", absolutePath: "C:/project/.pi/plan/p1.md" });
+  await click({ kind: "file", path: ".pi/plan/p1.md" });
+  assert.deepEqual(calls.tabs.map(({ sessionId, kind, resource }) => ({ sessionId, kind, resource })), [
+    { sessionId: "session-1", kind: "plan", resource: "p1" },
+  ]);
+  assert.deepEqual(calls.files, []);
 });
 
 test("a Windows tool path reaches resolution intact and opens its exact project file", async () => {

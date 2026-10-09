@@ -229,6 +229,7 @@ export const de = {
     sessionMissing: "Diese Sitzung existiert nicht mehr",
   },
   "chat": {
+    planFeedbackPlaceholder: "Änderungswünsche eingeben; Senden lehnt diesen Plan ab",
     "tableActions": "Tabellenaktionen",
     "markdownPlainTextFallback": "Große Antworten werden zur besseren Reaktionsfähigkeit als Klartext angezeigt.",
     "largeTextPageControls": "Seiten der großen Ausgabe",
@@ -583,6 +584,9 @@ export const de = {
     superseded: "Ersetzt",
   },
   "plan": {
+    revise: "Plan überarbeiten",
+    revisePrompt:
+      "Überarbeite den bestehenden Plan „{{title}}“ ({{path}}) und reiche eine neue Version ein. Änderungen:\n",
     build: "Erstellen",
     dependencyGraph: "Abhängigkeitsgraph",
     newTask: "Neu",
@@ -614,7 +618,6 @@ export const de = {
     stepTitleLabel: "Aufgabentitel",
     untitledStep: "Unbenannte Aufgabe",
     addDetail: "Detail hinzufügen",
-    hideDetail: "Detail ausblenden",
     stepDetailLabel: "Aufgabendetail",
     stepDetailPlaceholder: "Optionales Detail zu dieser Aufgabe",
     wouldCreateCycle: "Würde einen Zyklus erzeugen",
@@ -668,6 +671,9 @@ export const de = {
     "graphDirectionVertical": "Vertikal",
   },
   "goal": {
+    revise: "Ziel überarbeiten",
+    revisePrompt:
+      "Überarbeite das bestehende Ziel „{{title}}“ ({{path}}) und reiche eine neue Version ein. Änderungen:\n",
     viewPlan: "Plan ansehen",
     reviewEditPlan: "Plan prüfen und bearbeiten",
     "planning": "Ziel definieren",

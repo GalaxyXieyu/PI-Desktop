@@ -9,7 +9,9 @@ import {
 } from "../../features/plan/plan-draft-model";
 import { usePlanDraft } from "../../features/plan/plan-draft-store";
 import { usePlanProposal } from "../../features/plan/use-plan-proposal";
+import { usePlanRevise } from "../../features/plan/use-plan-revise";
 import { Badge, Button } from "../ui";
+import { IconPencil } from "../icons";
 import { PlanDocument } from "../plan/PlanDocument";
 import { PlanBuildControls } from "../plan/PlanBuildControls";
 
@@ -27,6 +29,7 @@ function PlanTabContent({ proposal, remote }: { proposal: PlanProposal; remote: 
   const [draft, dispatch] = usePlanDraft(proposal);
   const pluginViews = useAppStore((state) => state.pluginViews);
   const openTab = useAppStore((state) => state.openWorkPanelTabForSession);
+  const revise = usePlanRevise(proposal, remote);
   const path = proposal.artifact?.relativePath?.trim();
   const pending = proposal.status === "pending";
   const isPlan = proposal.kind === "plan";
@@ -58,6 +61,11 @@ function PlanTabContent({ proposal, remote }: { proposal: PlanProposal; remote: 
         />
       </div>}
       {pending && !isPlan && !remote && <div className="plan-tab-actions" />}
+      {revise.available && <div className="plan-tab-actions">
+        <Button size="sm" variant="primary" data-testid="plan-revise" onClick={() => void revise.revise()}>
+          <IconPencil size={13} aria-hidden /> {t(`${proposal.kind}.revise`)}
+        </Button>
+      </div>}
     </header>
     {remote && <p className="plan-tab-message">{t("plan.remoteReadOnly")}</p>}
     {remote && pending && isPlan && <p className="plan-tab-message">{t("plan.remoteNoEditing")}</p>}

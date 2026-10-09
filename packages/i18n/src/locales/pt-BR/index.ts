@@ -228,6 +228,7 @@ export const ptBR = {
     sessionMissing: "Essa sessão não existe mais"
   },
   chat: {
+    planFeedbackPlaceholder: "Digite as alterações como feedback; enviar rejeita este plano",
     tableActions: "Ações da tabela",
     markdownPlainTextFallback: "Respostas extensas são exibidas como texto simples para manter a interface responsiva.",
     largeTextPageControls: "Páginas da saída extensa",
@@ -581,6 +582,9 @@ export const ptBR = {
     superseded: "Substituído",
   },
   plan: {
+    revise: "Revisar plano",
+    revisePrompt:
+      "Revise o plano existente \"{{title}}\" ({{path}}) e envie uma nova versão. Alterações:\n",
     build: "Construir",
     dependencyGraph: "Grafo de dependências",
     newTask: "Nova",
@@ -612,7 +616,6 @@ export const ptBR = {
     stepTitleLabel: "Título da tarefa",
     untitledStep: "Tarefa sem título",
     addDetail: "Adicionar detalhe",
-    hideDetail: "Ocultar detalhe",
     stepDetailLabel: "Detalhe da tarefa",
     stepDetailPlaceholder: "Detalhe opcional desta tarefa",
     wouldCreateCycle: "Criaria um ciclo",
@@ -666,6 +669,9 @@ export const ptBR = {
     graphDirectionVertical: "Vertical",
   },
   goal: {
+    revise: "Revisar meta",
+    revisePrompt:
+      "Revise a meta existente \"{{title}}\" ({{path}}) e envie uma nova versão. Alterações:\n",
     viewPlan: "Ver plano",
     reviewEditPlan: "Revisar e editar plano",
     planning: "Definindo objetivo",

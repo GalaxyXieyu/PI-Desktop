@@ -33,3 +33,24 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* A plan artifact named in message prose reads as the plan, not a file link. */
+.plan-link-chip {
+  display: inline-flex;
+  max-width: 100%;
+  margin-block: 2px;
+  vertical-align: middle;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-full);
+  color: var(--ds-text-primary);
+  text-align: start;
+}
+.plan-link-chip:hover:not(:disabled) {
+  border-color: var(--ds-border-strong);
+}
+.plan-link-chip-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

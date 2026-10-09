@@ -91,7 +91,7 @@ import {
   messageErrorFromUnknown,
   assistantErrorMessage,
   sessionModeForPlanningState,
-  openPlanArtifact,
+  openPlanReview,
   decorateSessions,
   promoteProjectPath,
   removeProjectPath,
@@ -176,7 +176,7 @@ export const useAppStore = create<AppState>((set, get) => {
     decorateSessions,
     withoutRecordKey,
     sessionModeForPlanningState,
-    openPlanArtifact,
+    openPlanReview,
     rememberSessionCompactions,
     commitForkedSession,
     persistSessionAndSelect,
@@ -234,7 +234,7 @@ export const useAppStore = create<AppState>((set, get) => {
     runtime: sessionRuntime,
     withoutRecordKey,
     sessionModeForPlanningState,
-    openPlanArtifact,
+    openPlanReview,
     notifyInteractivePrompt,
     triggerAutoTitleSummarization,
     flushPendingSessionConfiguration,
@@ -399,17 +399,9 @@ export const useAppStore = create<AppState>((set, get) => {
         sessionOutcomes: latestSessionOutcomes(notifications.notifications),
       });
 
-      // The artifact's surface depends on which plugin views are launchable, and
-      // the launcher list is only read after `ready`. Resolve it before the
-      // restore, so the approval artifact does not fall back to the host file tab
-      // and then take a second tab from `selectSession`.
       await get().refreshPluginViews();
       for (const proposal of activePendingPlans) {
-        openPlanArtifact(
-          proposal,
-          get().openWorkPanelTabForSession,
-          get().pluginViews,
-        );
+        openPlanReview(proposal, get().openWorkPanelTabForSession);
       }
       saveSidebarPreferences(preferencesFromState(get()));
       if (currentWorkspace?.path) {

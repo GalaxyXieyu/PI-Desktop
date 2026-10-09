@@ -46,7 +46,7 @@ Object.assign(globalThis, {
       assert(card.querySelector(".plan-history-body h1")?.textContent === "Exact " + proposal.title, "full Markdown snapshot was capped or missing");
       assert(card.querySelector(".plan-history-body")?.textContent?.includes("END-" + proposal.title), "Markdown tail was lost");
       flushSync(() => card.querySelector<HTMLButtonElement>(".plan-history-artifact")!.click());
-      assert(useAppStore.getState().workPanelFileRequest?.path === proposal.artifact!.relativePath, "artifact did not open for its owning session");
+      assert(useAppStore.getState().activeWorkPanelTabId === `plan:${proposal.id}`, "artifact did not open the plan tab for its owning session");
       assert(!card.querySelector(".plan-approve") && !card.textContent?.includes("Approve (Ask)"), "history must not offer approval actions");
     }
     return { cards: cards.length, locale, statuses };

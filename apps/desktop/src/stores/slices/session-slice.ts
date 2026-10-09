@@ -66,10 +66,9 @@ export type SessionSliceDependencies = StoreAccess & {
     state: AppState["planningStates"][string],
     kind: ProposalKind | undefined,
   ) => Mode;
-  openPlanArtifact: (
+  openPlanReview: (
     proposal: PlanProposal,
     openWorkPanelTabForSession: AppState["openWorkPanelTabForSession"],
-    pluginViews: AppState["pluginViews"],
   ) => void;
   rememberSessionCompactions: (
     sessionId: string,
@@ -148,7 +147,7 @@ export function createSessionSlice({
   decorateSessions,
   withoutRecordKey,
   sessionModeForPlanningState,
-  openPlanArtifact,
+  openPlanReview,
   rememberSessionCompactions,
   commitForkedSession,
   persistSessionAndSelect,
@@ -250,11 +249,7 @@ export function createSessionSlice({
           ),
         }));
         if (checkpoint && activeProposal) {
-          openPlanArtifact(
-            checkpoint,
-            get().openWorkPanelTabForSession,
-            get().pluginViews,
-          );
+          openPlanReview(checkpoint, get().openWorkPanelTabForSession);
         }
         return activeProposal ? "pending" : "terminal";
       } catch {

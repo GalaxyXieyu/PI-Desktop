@@ -1130,11 +1130,10 @@ function assertPendingUi(snapshot, locale, revision) {
     `Ask is not the default approval action: ${snapshot.bar.approveLabel}`,
   );
   assert(snapshot.bar.actionButtonCount === 3, `unexpected pending approval actions: ${snapshot.bar.actionButtonCount}`);
-  assert(snapshot.promptReadOnly === true && snapshot.promptAriaReadOnly === "true", "pending Plan prompt is not read-only");
+  assert(snapshot.promptReadOnly === false && snapshot.promptAriaReadOnly !== "true", "pending Plan prompt must stay editable for feedback");
   assert(snapshot.modelDisabled === true, "pending Plan model control is not gated");
   assert(snapshot.modeDisabled === true, "pending Plan mode control is not gated");
   assert(snapshot.permissionDisabled === true, "pending Plan permission control is not gated");
-  assert(snapshot.sendDisabled === true, "pending Plan send control is not gated");
   assertNoLegacyUi(snapshot, `pending ${locale}`);
 }
 

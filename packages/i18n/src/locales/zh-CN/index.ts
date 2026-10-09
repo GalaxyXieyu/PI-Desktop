@@ -231,6 +231,7 @@ export const zhCN = {
     sessionMissing: "该会话已不存在",
   },
   chat: {
+    planFeedbackPlaceholder: "输入修改意见，发送后会拒绝当前计划并交给 agent 重新规划",
     tableActions: "表格操作",
     markdownPlainTextFallback: "内容较长，为保持界面响应速度，现以纯文本显示。",
     largeTextPageControls: "大段输出分页",
@@ -587,6 +588,9 @@ export const zhCN = {
     superseded: "已被新版本替代",
   },
   plan: {
+    revise: "修改计划",
+    revisePrompt:
+      "请基于已有计划《{{title}}》（{{path}}）修改后重新提交一版。修改要点：\n",
     build: "构建",
     dependencyGraph: "依赖图",
     newTask: "新建",
@@ -618,7 +622,6 @@ export const zhCN = {
     stepTitleLabel: "任务标题",
     untitledStep: "未命名任务",
     addDetail: "添加详情",
-    hideDetail: "收起详情",
     stepDetailLabel: "任务详情",
     stepDetailPlaceholder: "此任务的可选详情",
     wouldCreateCycle: "会形成循环依赖",
@@ -672,6 +675,9 @@ export const zhCN = {
     graphDirectionVertical: "纵向",
   },
   goal: {
+    revise: "修改目标",
+    revisePrompt:
+      "请基于已有目标《{{title}}》（{{path}}）修改后重新提交一版。修改要点：\n",
     viewPlan: "查看/编辑计划",
     reviewEditPlan: "查看/编辑计划",
     planning: "正在明确目标",

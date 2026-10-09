@@ -231,6 +231,7 @@ export const zhTW = {
     sessionMissing: "該對話已不存在",
   },
   chat: {
+    planFeedbackPlaceholder: "輸入修改意見，送出後會拒絕目前計畫並交給 agent 重新規劃",
     tableActions: "表格操作",
     markdownPlainTextFallback: "內容較長，為維持介面回應速度，現以純文字顯示。",
     largeTextPageControls: "大型輸出分頁",
@@ -587,6 +588,9 @@ export const zhTW = {
     superseded: "已被新版本取代",
   },
   plan: {
+    revise: "修改計畫",
+    revisePrompt:
+      "請基於既有計畫《{{title}}》（{{path}}）修改後重新提交一版。修改重點：\n",
     build: "建置",
     dependencyGraph: "相依圖",
     newTask: "新增",
@@ -618,7 +622,6 @@ export const zhTW = {
     stepTitleLabel: "任務標題",
     untitledStep: "未命名任務",
     addDetail: "新增詳情",
-    hideDetail: "收起詳情",
     stepDetailLabel: "任務詳情",
     stepDetailPlaceholder: "此任務的選填詳情",
     wouldCreateCycle: "會形成循環相依",
@@ -672,6 +675,9 @@ export const zhTW = {
     graphDirectionVertical: "縱向",
   },
   goal: {
+    revise: "修改目標",
+    revisePrompt:
+      "請基於既有目標《{{title}}》（{{path}}）修改後重新提交一版。修改重點：\n",
     viewPlan: "查看/編輯計畫",
     reviewEditPlan: "查看/編輯計畫",
     planning: "正在明確目標",

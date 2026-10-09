@@ -33,10 +33,7 @@ const interactionSource = readStoreModuleSync("slices/interaction-slice.ts");
 
 test("plan approval exposes artifact and document entries and remembers the selected mode", () => {
   assert.match(approvalBar, /proposal\.title/);
-  assert.match(
-    approvalBar,
-    /preferredFileWorkPanelTab\(artifactPath, pluginViews\)/,
-  );
+  assert.doesNotMatch(approvalBar, /preferredFileWorkPanelTab/);
   assert.match(approvalBar, /openWorkPanelTabForSession/);
   assert.match(approvalBar, /const isPending = proposal\.status === "pending"/);
   assert.match(approvalControls, /PLAN_APPROVAL_DEFAULT_MODE/);
@@ -104,7 +101,7 @@ test("terminal execution snapshots are represented and do not gate a later promp
   assert.match(planStateSource, /status === "expired"/);
   assert.match(planStateSource, /return "interrupted"/);
   assert.match(composerSource, /const runActive = isRunning \|\| executionActive/);
-  assert.match(composerSource, /const sendBlocked = approvalPending \|\| pasting/);
+  assert.match(composerSource, /const sendBlocked = pasting \|\| nativeInputBlocked;/);
   assert.match(composerSource, /planCheckpoint\?\.status === "pending"[\s\S]*<PlanApprovalBar/);
   assert.doesNotMatch(approvalBar, /request_changes|requestChanges/);
 });

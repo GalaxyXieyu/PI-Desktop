@@ -236,6 +236,7 @@ export const en = {
     sessionMissing: "That session no longer exists",
   },
   chat: {
+    planFeedbackPlaceholder: "Describe the changes you want; sending rejects this plan and replans",
     tableActions: "Table actions",
     markdownPlainTextFallback: "Large response shown as plain text to keep the conversation responsive.",
     largeTextPageControls: "Large output pages",
@@ -595,6 +596,9 @@ export const en = {
     superseded: "Superseded",
   },
   plan: {
+    revise: "Revise plan",
+    revisePrompt:
+      "Revise the existing plan \"{{title}}\" ({{path}}) and submit a new version. Changes:\n",
     build: "Build",
     dependencyGraph: "Dependency graph",
     newTask: "New",
@@ -626,7 +630,6 @@ export const en = {
     stepTitleLabel: "Task title",
     untitledStep: "Untitled task",
     addDetail: "Add detail",
-    hideDetail: "Hide detail",
     stepDetailLabel: "Task detail",
     stepDetailPlaceholder: "Optional detail for this task",
     wouldCreateCycle: "Would create a cycle",
@@ -680,6 +683,9 @@ export const en = {
     graphDirectionVertical: "Vertical",
   },
   goal: {
+    revise: "Revise goal",
+    revisePrompt:
+      "Revise the existing goal \"{{title}}\" ({{path}}) and submit a new version. Changes:\n",
     viewPlan: "View plan",
     reviewEditPlan: "Review & edit plan",
     planning: "Defining goal",

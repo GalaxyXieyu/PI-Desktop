@@ -116,7 +116,12 @@ plan metadata, retaining a v22 backup and all existing metadata.
 The approval bar offers a secondary document entry for both Plan and Goal
 proposals. Plans with structured metadata show task/design summary chips and
 use the review-and-edit label. The entry opens a session-scoped `plan:<id>` work
-panel tab; the existing artifact opener and approval controls are unchanged.
+panel tab; the artifact opener and chat links to the artifact open the same tab
+(D647), and the approval controls are unchanged.
+Once a proposal is settled and its execution is not queued or running, the
+local tab offers a revise action instead of in-place editing: it returns the
+idle session to the contract mode and seeds the composer so the Agent submits a
+new proposal (D648).
 Tab sanitization, reordering, deduplication, and session switching retain this
 resource like other work-panel resources.
 

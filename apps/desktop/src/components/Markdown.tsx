@@ -70,6 +70,8 @@ import { useReferencedImageDataUrl } from "../lib/use-referenced-image-data-url"
 import { absoluteImagePath, remarkLocalImagePaths } from "../lib/markdown-image-paths";
 import { remarkNormalizeWrappedMarkdownLinkDestinations } from "../lib/markdown-link-destinations";
 import { useOpenChatFileRef } from "../hooks/use-preview-target";
+import { findPlanByArtifactPath } from "../features/plan/plan-artifact-link";
+import { PlanLinkChip } from "./plan/PlanLinkChip";
 import {
   useChatFileMenuItems,
   type ChatFileMenuTarget,
@@ -579,6 +581,10 @@ function Anchor({
   const openFileMenu = useContext(MarkdownFileMenuContext);
   const openUrl = useAppStore((s) => s.openUrlInWorkPanel);
   const showToast = useAppStore((s) => s.showToast);
+  const planRef = href && !/^https?:\/\//i.test(href)
+    ? toWorkspaceRel(safeDecodeUri(href), root, baseDir)
+    : null;
+  const plan = useAppStore((s) => findPlanByArtifactPath(s, planRef));
 
   const { contextMenu, openContextMenu, closeContextMenu } = useContextMenu();
 
@@ -674,6 +680,7 @@ function Anchor({
       openFileRef(ref, baseDir);
     }
   };
+  if (plan) return <PlanLinkChip proposal={plan} />;
   return (
     <>
       <a

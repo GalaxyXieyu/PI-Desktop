@@ -1133,9 +1133,9 @@ entirely inside the plugin's isolated page:
   context the viewport-fixed toggle and `Cmd/Ctrl + J` reveal, so a successful
   workspace Write/Edit cannot open, activate, or resize the panel in any
   session.
-  The plan/goal approval artifact still creates or activates a tab in its
-  originating session, but the host picks its surface: the bundled file view when
-  that view is launchable, otherwise the host file tab (D452).
+  The plan/goal approval reveal still creates or activates a tab in its
+  originating session; that tab is the proposal's structured `plan:<id>` tab
+  (D647).
   The viewport-fixed toggle and `Cmd/Ctrl + J` both toggle the active session's
   retained panel context: they reveal the panel without creating a resource and
   collapse the visible panel without deleting one. With no active session the
@@ -2719,7 +2719,8 @@ execution permission mode, not an individual tool call.
 ### 10A.2 Content
 
 The card renders the structured title and an opener for the exact
-`.pi/<kind>/*.md` path; the opener prefers the bundled file view and falls back
+`.pi/<kind>/*.md` path; the opener reveals the proposal's structured Plan tab
+(D647), whose own artifact button prefers the bundled file view and falls back
 to the host file tab when that view is not launchable (D452). Opening the
 artifact reads the host-written file; renderer edits do not change the approved
 bytes. The submitted question/description, status, validity/deadline, inline
@@ -2932,7 +2933,7 @@ reasoning-level control.
 | Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls. A retained-tail fallback remains Running and shows a warning toast | Same single-slot Stop/Send behavior as Running |
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled; Stop remains active whenever the running empty-draft condition is met |
 | Plan / Goal / planning | textarea active while idle; contract badge and permission chip visible; mode chip pulses while the live turn projects `planning` | inspect, send, or submit a contract |
-| Plan / Goal / awaiting approval | approval surface shows only the title and artifact opener for the exact `.pi/<kind>/*.md` approval; draft is preserved read-only and composer controls remain blocked for that session | approve or reject |
+| Plan / Goal / awaiting approval | approval surface shows only the title and artifact opener for the exact `.pi/<kind>/*.md` approval; the draft stays editable and sending it rejects the proposal as change feedback (D649); composer configuration controls remain blocked for that session | approve, reject, or send feedback |
 | Plan / queued or running | Agent badge remains selected; queue/running state is visible; draft and next-turn controls remain editable | Stop; Send queues the next prompt; no replay control |
 | Plan / Goal / planning after rejected, expired, or interrupted proposal | contract chip remains visible and editable | send a later prompt; submit a new contract; no execution action |
 | No workspace | textarea active, warning banner "No project — tools limited" | Send enabled |

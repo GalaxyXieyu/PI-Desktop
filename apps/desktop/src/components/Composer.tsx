@@ -155,7 +155,7 @@ export function Composer({
     prefill,
     t,
     invalidatePromptEnhancement,
-    inputBlocked: planCheckpoint?.status === "pending" || nativeInputBlocked,
+    inputBlocked: nativeInputBlocked,
   });
   const {
     ref,
@@ -196,7 +196,7 @@ export function Composer({
     settings?.largePasteThreshold,
   );
   const attachments = useComposerAttachments({
-    inputBlocked: approvalPending || nativeSession,
+    inputBlocked: nativeSession,
     activeSessionId,
     draftKey,
     largePasteThreshold,
@@ -226,9 +226,9 @@ export function Composer({
   } = attachments;
   const executionActive = isActivePlanExecution(planCheckpoint);
   const runActive = isRunning || executionActive;
-  const inputBlocked = approvalPending || pasting || nativeInputBlocked;
+  const inputBlocked = pasting || nativeInputBlocked;
   const controlsBlocked = approvalPending || nativeSession;
-  const sendBlocked = approvalPending || pasting || nativeInputBlocked;
+  const sendBlocked = pasting || nativeInputBlocked;
   const enhancementDraft = stripInlineComposerFileReferenceTokens(
     value,
     activeFileReferences,
@@ -246,7 +246,7 @@ export function Composer({
   const placeholderKeys = PLACEHOLDER_KEYS[variant];
   const placeholderKey =
     placeholderKeys[placeholderIndex % placeholderKeys.length] ?? placeholderKeys[0];
-  const placeholderText = t(placeholderKey);
+  const placeholderText = t(approvalPending ? "chat.planFeedbackPlaceholder" : placeholderKey);
 
   const textareaMetricsRef = useRef<{ lineHeight: number; verticalChrome: number } | null>(null);
   const appliedHeightRef = useRef<number | null>(null);

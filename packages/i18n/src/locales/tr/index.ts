@@ -238,6 +238,7 @@ export const tr = {
     sessionMissing: "Bu oturum artık mevcut değil",
   },
   chat: {
+    planFeedbackPlaceholder: "Değişiklikleri geri bildirim olarak yazın; göndermek bu planı reddeder",
     tableActions: "Tablo işlemleri",
     markdownPlainTextFallback: "Büyük yanıtlar arayüzün duyarlı kalması için düz metin olarak gösterilir.",
     largeTextPageControls: "Büyük çıktı sayfaları",
@@ -592,6 +593,9 @@ export const tr = {
     superseded: "Yeni sürümle değiştirildi",
   },
   plan: {
+    revise: "Planı düzenle",
+    revisePrompt:
+      "Mevcut \"{{title}}\" planını ({{path}}) düzenleyip yeni bir sürüm gönder. Değişiklikler:\n",
     build: "Oluştur",
     dependencyGraph: "Bağımlılık grafiği",
     newTask: "Yeni",
@@ -623,7 +627,6 @@ export const tr = {
     stepTitleLabel: "Görev başlığı",
     untitledStep: "Adsız görev",
     addDetail: "Ayrıntı ekle",
-    hideDetail: "Ayrıntıyı gizle",
     stepDetailLabel: "Görev ayrıntısı",
     stepDetailPlaceholder: "Bu görev için isteğe bağlı ayrıntı",
     wouldCreateCycle: "Döngü oluşturur",
@@ -677,6 +680,9 @@ export const tr = {
     graphDirectionVertical: "Dikey",
   },
   goal: {
+    revise: "Hedefi düzenle",
+    revisePrompt:
+      "Mevcut \"{{title}}\" hedefini ({{path}}) düzenleyip yeni bir sürüm gönder. Değişiklikler:\n",
     viewPlan: "Planı görüntüle",
     reviewEditPlan: "Planı incele ve düzenle",
     planning: "Hedef tanımlanıyor",
