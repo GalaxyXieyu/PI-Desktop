@@ -29,6 +29,7 @@ import {
   type AgentPromptAttachment,
   type MessageAttachment,
 } from "@pi-desktop/shared";
+import { remoteSessionFolder } from "./remote-attachments.js";
 
 export { MAX_INLINE_IMAGE_BYTES } from "@pi-desktop/shared";
 
@@ -68,13 +69,15 @@ const IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
 };
 type PromptPath = {
   absolute: string;
-  root: "project" | "scratch" | "attachment";
+  root: "project" | "scratch" | "attachment" | "remote";
 };
 
 export type PreparedPromptAttachment = {
   message: MessageAttachment;
   fallbackPath: string;
   inlineData?: string;
+  /** Validated remote text, flattened by the existing prompt adapter. */
+  fallbackContent?: string;
 };
 
 function pathInside(root: string, candidate: string): boolean {
@@ -126,6 +129,7 @@ function resolvePromptPath(
   const roots: Array<{ path: string; root: PromptPath["root"] }> = [
     { path: scratchRoot, root: "scratch" },
     { path: attachmentRoot, root: "attachment" },
+    { path: join(dataRoot, "remote-attachments", remoteSessionFolder(sessionId)), root: "remote" },
     ...(projectPath ? [{ path: projectPath, root: "project" as const }] : []),
   ];
   const candidate = isAbsolute(trimmed)
@@ -209,7 +213,7 @@ async function fallbackPathForStoredAttachment(
   source: PromptPath,
   name: string,
 ): Promise<string> {
-  if (source.root !== "attachment") return source.absolute;
+  if (source.root !== "attachment" && source.root !== "remote") return source.absolute;
   const root = join(dataRoot, "scratch", sessionId, "replayed");
   mkdirSync(root, { recursive: true });
   const safeName = name.replace(/[^\p{L}\p{N}._-]+/gu, "_") || "attachment";
@@ -254,18 +258,27 @@ export async function preparePromptAttachments(
     const name = attachment.name.trim() || source.absolute.split(/[\\/]/).at(-1) || "attachment";
     const mimeType = promptMimeType(source.absolute, attachment.mimeType, name);
     const isImage = isImagePromptAttachment(attachment, source.absolute);
+    if (source.root === "remote" && isImage && !supportsVision) {
+      throw Object.assign(new Error("The selected model does not accept images"), { errorCode: "MODEL_VISION_UNSUPPORTED" });
+    }
     if (!isImage) {
+      // Remote uploads expire. Persist both the transcript ref and a readable
+      // fallback before accepting the prompt; ordinary desktop paths stay as-is.
+      const remoteRef = source.root === "remote"
+        ? await ensureAttachmentBlobFromFile(dataRoot, source.absolute)
+        : undefined;
       prepared.push({
         message: {
           kind: "file",
           name,
-          ref: attachment.path,
+          ref: remoteRef ?? attachment.path,
           ...(mimeType !== "application/octet-stream" ? { mimeType } : {}),
           ...(Number.isFinite(attachment.size) ? { size: attachment.size } : {}),
         },
-        fallbackPath: mimeType === SVG_MIME_TYPE && source.root === "attachment"
+        fallbackPath: source.root === "remote" || (mimeType === SVG_MIME_TYPE && source.root === "attachment")
           ? await fallbackPathForStoredAttachment(dataRoot, sessionId, source, name)
           : displayPromptPath(source, projectPath),
+        ...(source.root === "remote" ? { fallbackContent: `\n--- Attachment: ${name} ---\n${await readFile(source.absolute, "utf8")}\n--- End attachment ---\n` } : {}),
       });
       continue;
     }
@@ -345,7 +358,7 @@ export function appendPromptFallbackPaths(
       (attachment) =>
         attachment.message.inlinePath !== formatPromptPathText(attachment.fallbackPath),
     )
-    .map((attachment) => formatFileInsert(attachment.fallbackPath, "file"))
+    .map((attachment) => attachment.fallbackContent ?? formatFileInsert(attachment.fallbackPath, "file"))
     .join("")
     .trim();
   const text = content.trim();

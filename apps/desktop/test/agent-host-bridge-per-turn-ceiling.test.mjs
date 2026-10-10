@@ -142,3 +142,13 @@ test("a widening per-turn ceiling refuses the turn — no sidecar call reaches t
     "bridge must throw a FORBIDDEN with the widening-specific message",
   );
 });
+
+test("a matching remote Ask mode is pinned and carries the atomic admission guard", async () => {
+  const { bridge, prompts } = fixture({ sessionPermissionMode: "ask" });
+  const result = await callStart(bridge, {
+    subject: "remote", roles: ["owner"], pairedDevice: false, requireAskSession: true,
+  });
+  assert.equal(result.accepted, true);
+  assert.equal(prompts[0].request.permissionMode, "ask");
+  assert.equal(prompts[0].request.requiredPermissionMode, "ask");
+});

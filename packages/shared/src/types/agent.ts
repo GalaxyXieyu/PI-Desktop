@@ -48,16 +48,12 @@ export type AgentPromptRequest = {
    */
   viewingSessionId?: string | null;
   /**
-   * Per-turn permission ceiling override (spec §7.3): the effective mode the
-   * remote layer computed for this specific turn, which the runtime must apply
-   * for tool decisions instead of the session's stored mode. Absent means the
-   * session's stored mode is used. Accepted only when the requested mode is
-   * narrower than or equal to the session's mode; a wider request is refused
-   * before the turn starts. The bridge forwards this end-to-end so the
-   * host-core scoping (still pending, R1 leftover) can enforce it turn-locally
-   * once it lands.
+   * Per-turn ceiling installed by host-core at beginTurn. The effective mode
+   * can only narrow and remains capped if session/global settings change.
    */
   permissionMode?: RacpPermissionMode;
+  /** Main-private admission guard, rechecked by Rust before opening the turn. */
+  requiredPermissionMode?: "ask";
 };
 
 export type AgentPromptAttachment = {

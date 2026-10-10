@@ -420,15 +420,14 @@ Recorded on the `feat/remote-agent-host` branch, 2026-09-10:
   composer pushes through `agent/queue/push`, mirrors
   `agent/event/queueChanged`, and "send now" is `turn/prioritize` plus a
   graceful stop.
-- R1 partial (2026-09-18): the runtime-level per-turn permission ceiling is
-  plumbed end-to-end (`AgentPromptRequest.permissionMode` → agent-ipc →
-  `RuntimeService.startTurn` → sidecar `agent.prompt`), and the bridge no
-  longer fails closed on every session/effective-mode mismatch. A widening
-  request (effective more permissive than session) is still refused as
-  defence-in-depth; a narrower ceiling is forwarded and recorded by the
-  sidecar as a documented stub. Turn-scoped enforcement in host-core
-  (`session.beginTurn` accepting an override) is the remaining piece, so a
-  narrower ceiling on a local turn does not yet clamp tool decisions.
+- R1 turn ceiling is enforced in host-core: `session.beginTurn` atomically
+  installs the explicit ceiling and both tool execution and permission
+  evaluation clamp against it. Remote turns pin it even when the current mode
+  already matches; later desktop mode changes and subagent scopes cannot
+  widen it. The sidecar no longer carries a log-only enforcement stub.
+  The separate opt-in desktop REST/SSE bridge is specified in
+  [desktop-remote-bridge](../03-runtime/desktop-remote-bridge.md); it is not
+  the RACP-WS binding or an extension of local MCP.
 - R2 started (2026-09-18, D447 / ADR 0284): `packages/host-runtime` holds the
   Electron-independent runtime layer — the host-core and sidecar stdio
   transports, the restart supervisor, `RuntimeService` (the module's

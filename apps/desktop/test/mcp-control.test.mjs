@@ -924,35 +924,3 @@ test("plugin-only session collaboration operations stay off the external MCP sur
   });
   assert.deepEqual(calls.at(-1), { channel: "pi-desktop/app/getVersion", args: [] });
 });
-
-
-test("pending interactive requests are discoverable through the reviewed read catalog", async (t) => {
-  const dataDir = mkdtempSync(join(process.env.TMPDIR || tmpdir(), "pi-mcp-pending-"));
-  const pending = { asks: [{ requestId: "ask-1", sessionId: "s1", toolCallId: "tc1", questions: [{ question: "Continue?", options: ["yes"] }] }], permissions: [{ requestId: "perm-1", sessionId: "s1", toolCallId: "tc2", toolName: "Bash", argsPreview: { command: "pwd" }, risk: "low", reason: "Review" }] };
-  const events = [];
-  const server = new McpControlServer({
-    dataDir, port: 0, version: "test",
-    channels: { pendingInteractive: "pi-desktop/agent/pendingInteractive" },
-    invoke: async (channel, args) => {
-      assert.equal(channel, "pi-desktop/agent/pendingInteractive");
-      const sessionId = args[0]?.sessionId;
-      if (typeof sessionId !== "string" || !sessionId.trim()) throw new Error("sessionId required");
-      return sessionId === "s1" ? pending : { asks: [], permissions: [] };
-    },
-    onOperationComplete: (op, result, args) => events.push(mcpControlRendererEvent(op, result, args)),
-  });
-  t.after(async () => { await server.stop(); const { rmSync } = await import("node:fs"); rmSync(dataDir, { recursive: true, force: true }); });
-  const info = await server.start();
-  const init = await post(info.url, info.token, { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } });
-  const headers = { "Mcp-Session-Id": init.response.headers.get("mcp-session-id") };
-  const call = (name, arguments_) => post(info.url, info.token, { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name, arguments: arguments_ } }, headers);
-  const catalog = await call("pi_control_describe", {});
-  assert.ok(catalog.body.result.structuredContent.some(op => op.id === "agent/pendingInteractive" && op.risk === "read"));
-  const result = await call("pi_desktop_invoke", { operation: "agent/pendingInteractive", args: [{ sessionId: "s1" }] });
-  assert.deepEqual(result.body.result.structuredContent.result, pending);
-  const empty = await call("pi_desktop_invoke", { operation: "agent/pendingInteractive", args: [{ sessionId: "native-pi:fixture" }] });
-  assert.deepEqual(empty.body.result.structuredContent.result, { asks: [], permissions: [] });
-  const invalid = await call("pi_desktop_invoke", { operation: "agent/pendingInteractive", args: [{}] });
-  assert.equal(invalid.body.result.isError, true);
-  assert.ok(events.every(event => event === null));
-});

@@ -136,7 +136,7 @@ export class PlanExecutionDispatcher {
         const launch = await this.options.launch.resolve(execution.sessionId, sessionResult.session, settings ?? {}, {
           mode: "agent",
         });
-        turnId = await this.options.runtime.beginTurn(execution.sessionId, launch.providerId, launch.modelId);
+        turnId = await this.options.runtime.beginTurn(execution.sessionId, launch.providerId, launch.modelId, undefined, execution.targetPermissionMode);
         this.approvedExecutionIdsBySession.set(execution.sessionId, execution.id);
         this.executionTurns.set(execution.id, { sessionId: execution.sessionId, turnId });
         this.started.add(execution.id);

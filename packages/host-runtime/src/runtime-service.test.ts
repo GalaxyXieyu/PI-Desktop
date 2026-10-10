@@ -378,3 +378,13 @@ describe("RuntimeService prompt lifecycle", () => {
     ).rejects.toMatchObject({ errorCode: "INVALID_ARGUMENT" });
   });
 });
+
+it("pins a matching remote Ask ceiling and admission guard before the sidecar prompt", async () => {
+  const { service, host, sidecar } = build();
+  await service.prompt({ sessionId: "s1", content: "remote", effectivePermissionMode: "ask",
+    principal: { subject: "remote", roles: ["owner"], pairedDevice: false, requireAskSession: true } });
+  expect(host.calls.find(call => call.method === "session.beginTurn")?.params).toMatchObject({
+    permissionMode: "ask", requiredPermissionMode: "ask",
+  });
+  expect(sidecar.calls.find(call => call.method === "agent.prompt")?.params.turnId).toBe("turn-1");
+});

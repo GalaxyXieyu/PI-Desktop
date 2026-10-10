@@ -413,12 +413,22 @@ to later refresh and inference; the vendor picker does not collect them.
   last archive is lost. When the family is present in the durable transcript,
   the prefix in front of the restored branch is taken from there rather than
   from the caller. Surviving messages keep their owning `turn_id`
-- `session.beginTurn({ sessionId, providerId?, modelId?, sessionMessageId? })` —
+- `session.beginTurn({ sessionId, providerId?, modelId?, sessionMessageId?, permissionMode?, requiredPermissionMode? })` —
   starts one durable turn. When `sessionMessageId` is present, host-core
   atomically verifies that the queued collaboration delivery targets this
   session, rechecks its permission ceiling, claims the delivery, and binds the
   new turn to its message id. A collaboration turn cannot be started from
   caller-supplied replacement text.
+  Optional `permissionMode` is an explicit `ask` / `accept-edits` / `auto`
+  ceiling: Rust refuses widening against the effective stored mode, then pins
+  the ceiling in the process-local permission owner under the new turn ID.
+  Every tool evaluation (including plugin evaluation and subagent scope)
+  clamps to it even if session/global mode changes. An explicit Ask ceiling
+  ignores session-wide tool grants; existing low-risk, scratch and contract
+  rules remain. `requiredPermissionMode: "ask"` additionally requires the
+  stored session override to be Ask at atomic admission; `inherit` is not Ask.
+  End-turn removes only the matching turn's ceiling; startup fences running
+  durable turns, so no schema migration or replay is introduced.
 - `session.queuePush` / `session.queueList` / `session.queueRemove` /
   `session.queuePrioritize` / `session.queueReorder` — the Host-owned turn queue
   (D386 / ADR 0213 / ADR 0265, schema v18); push is idempotent per principal and

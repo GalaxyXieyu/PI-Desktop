@@ -449,6 +449,8 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
       sessionId: execution.sessionId,
       providerId: launch.providerId,
       modelId: launch.modelId,
+      // Approved execution keeps its reviewed ceiling, including remote Ask.
+      permissionMode: execution.targetPermissionMode,
     });
     turnId = String(turn.turnId || "").trim();
     if (!turnId) throw new Error("execution turn was not created");

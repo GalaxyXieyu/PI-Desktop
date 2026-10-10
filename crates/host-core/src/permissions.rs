@@ -110,13 +110,42 @@ pub struct PendingPermission {
     pub created_at: String,
 }
 
+pub fn permission_rank(mode: &str) -> u8 {
+    match mode {
+        "auto" => 2,
+        "accept-edits" => 1,
+        _ => 0,
+    }
+}
+
 #[derive(Default)]
 pub struct PermissionManager {
     pending: HashMap<String, Pending>,
     next_sequence: u64,
+    // Process-local: startup fences all durable running turns before execution.
+    turn_ceilings: HashMap<String, (String, String)>,
 }
 
 impl PermissionManager {
+    pub fn begin_turn_ceiling(&mut self, session_id: &str, turn_id: &str, mode: Option<&str>) {
+        self.turn_ceilings.remove(session_id);
+        if let Some(mode) = mode {
+            self.turn_ceilings
+                .insert(session_id.into(), (turn_id.into(), mode.into()));
+        }
+    }
+
+    pub fn end_turn_ceiling(&mut self, turn_id: &str) {
+        self.turn_ceilings.retain(|_, (id, _)| id != turn_id);
+    }
+
+    pub fn clamp_turn_mode<'a>(&'a self, session_id: &str, mode: &'a str) -> &'a str {
+        match self.turn_ceilings.get(session_id) {
+            Some((_, ceiling)) if permission_rank(ceiling) < permission_rank(mode) => ceiling,
+            _ => mode,
+        }
+    }
+
     pub fn tool_risk_with_declared(tool_name: &str, declared: Option<&str>) -> Risk {
         match tool_name {
             "Read" | "Glob" | "Grep" | "ScheduledTaskList" | "TodoWrite" => Risk::Low,
@@ -202,6 +231,13 @@ impl PermissionManager {
             requires_external_path_permission,
             plan_safe_actions,
         } = params;
+        // Clamp AFTER subagent scope/global/session resolution. A UI mode change
+        // cannot widen a remotely admitted turn, nor can a session-wide grant.
+        let permission_mode = self.clamp_turn_mode(session_id, permission_mode);
+        let allow_session_grants = !self
+            .turn_ceilings
+            .get(session_id)
+            .is_some_and(|(_, ceiling)| ceiling == "ask");
         // The contract modes' tool allowlist is authoritative. This check
         // intentionally precedes low-risk classification, auto, grants, and
         // scratch paths, and covers Goal as well as Plan (D198).
@@ -233,10 +269,11 @@ impl PermissionManager {
             if permission_mode == "auto" {
                 return Some(PermissionDecision::AllowOnce);
             }
-            if session_grants
-                .get(session_id)
-                .map(|g| g.iter().any(|t| t == tool_name))
-                .unwrap_or(false)
+            if allow_session_grants
+                && session_grants
+                    .get(session_id)
+                    .map(|g| g.iter().any(|t| t == tool_name))
+                    .unwrap_or(false)
             {
                 return Some(PermissionDecision::AllowSession);
             }
@@ -255,10 +292,11 @@ impl PermissionManager {
         if mode_allows {
             return Some(PermissionDecision::AllowOnce);
         }
-        if session_grants
-            .get(session_id)
-            .map(|g| g.iter().any(|t| t == tool_name))
-            .unwrap_or(false)
+        if allow_session_grants
+            && session_grants
+                .get(session_id)
+                .map(|g| g.iter().any(|t| t == tool_name))
+                .unwrap_or(false)
         {
             return Some(PermissionDecision::AllowSession);
         }
@@ -890,5 +928,40 @@ mod image_generation_tests {
             ),
             Some(PermissionDecision::Deny)
         );
+    }
+}
+
+#[cfg(test)]
+mod remote_ceiling_tests {
+    use super::*;
+
+    #[test]
+    fn turn_ceiling_survives_mode_changes_grants_and_stale_end() {
+        let mut manager = PermissionManager::default();
+        let grants = HashMap::from([("s".into(), vec!["Write".into(), "Bash".into()])]);
+        manager.begin_turn_ceiling("s", "remote", Some("ask"));
+        for mode in ["ask", "accept-edits", "auto"] {
+            for tool in ["Write", "Bash", "mcp_tool", "plugin_tool"] {
+                assert_eq!(
+                    manager.evaluate_auto_with_permission_mode("s", tool, "agent", mode, &grants),
+                    None
+                );
+            }
+        }
+        assert_eq!(
+            manager.evaluate_auto_with_permission_mode("s", "Read", "agent", "auto", &grants),
+            Some(PermissionDecision::AllowOnce)
+        );
+        assert_eq!(
+            manager.evaluate_auto_with_permission_mode("s", "Write", "plan", "auto", &grants),
+            Some(PermissionDecision::Deny)
+        );
+        manager.end_turn_ceiling("old");
+        assert_eq!(manager.clamp_turn_mode("s", "auto"), "ask");
+        manager.end_turn_ceiling("remote");
+        assert_eq!(manager.clamp_turn_mode("s", "auto"), "auto");
+        manager.begin_turn_ceiling("s", "next", Some("accept-edits"));
+        assert_eq!(manager.clamp_turn_mode("s", "ask"), "ask");
+        assert_eq!(manager.clamp_turn_mode("s", "auto"), "accept-edits");
     }
 }

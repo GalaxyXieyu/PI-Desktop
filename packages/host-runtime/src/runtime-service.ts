@@ -313,7 +313,9 @@ export class RuntimeService implements RuntimePort {
     const launch = await this.options.launch.resolve(sessionId, session, settings ?? {});
     sidecar.setProjectInstructionRoot(sessionId, launch.projectPath);
 
-    const turnId = await this.beginTurn(sessionId, launch.providerId, launch.modelId, sessionMessage?.origin.messageId);
+    const turnId = await this.beginTurn(sessionId, launch.providerId, launch.modelId, sessionMessage?.origin.messageId,
+      !request.principal.pairedDevice || this.sessionModeDiffers(session, request.effectivePermissionMode)
+        ? request.effectivePermissionMode : undefined, request.principal.requireAskSession);
 
     let content = sessionMessage?.content ?? request.content;
     let command: string | undefined;
@@ -360,10 +362,7 @@ export class RuntimeService implements RuntimePort {
         ...(sessionMessage ? { sessionMessage: sessionMessage.origin } : {}),
         attachments: [],
         userMessageId: userMessage.id,
-        // Per-turn permission ceiling override (R1 leftover; spec §7.3). Only
-        // forwarded when the effective mode differs from the session's stored
-        // mode — a widening request has already been refused upstream so any
-        // override that reaches here is narrower than or equal to session.
+        // The authoritative ceiling is already installed by beginTurn above.
         ...(request.effectivePermissionMode && this.sessionModeDiffers(session, request.effectivePermissionMode)
           ? { permissionMode: request.effectivePermissionMode }
           : {}),
@@ -522,12 +521,15 @@ export class RuntimeService implements RuntimePort {
   }
 
   /** Open a durable turn row and take ownership of the session for it. */
-  async beginTurn(sessionId: string, providerId: string, modelId: string, sessionMessageId?: string): Promise<string> {
+  async beginTurn(sessionId: string, providerId: string, modelId: string, sessionMessageId?: string,
+    permissionMode?: string, requireAskSession?: boolean): Promise<string> {
     const turn = await this.requireHost().call<{ turnId?: string }>("session.beginTurn", {
       sessionId,
       providerId,
       modelId,
       ...(sessionMessageId ? { sessionMessageId } : {}),
+      ...(permissionMode ? { permissionMode } : {}),
+      ...(requireAskSession ? { requiredPermissionMode: "ask" } : {}),
     });
     const turnId = String(turn?.turnId ?? "").trim();
     if (!turnId) throw new Error("session.beginTurn returned no turn");

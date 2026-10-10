@@ -17,6 +17,7 @@ import { registerPluginSchemes } from "../plugin-schemes";
 import { applyNetworkProxyFromAppSettings } from "../network-proxy";
 import { readCloseBehavior } from "../window-preferences";
 import { createAgentHostBridge, type AgentHostBridge } from "../agent-host-bridge";
+import { RemoteControlServer } from "../remote-control.js";
 import { createBackendRouter, type BackendRouter } from "../remote/backend-router";
 import { createRemoteHostsBoot, setActiveRemoteHostsBoot } from "./remote-hosts";
 import {
@@ -66,6 +67,7 @@ export type StartupState = {
   backendRouter: BackendRouter | null;
   desktopControl: McpControlController | null;
   mcpControl: McpControlServer | null;
+  remoteControl: RemoteControlServer | null;
 };
 
 export type StartupDependencies = {
@@ -337,6 +339,20 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
       applyToggleWindowShortcut();
     }
     await ensureWindow();
+    if (!bootError && state.agentHostBridge && process.env.PI_DESKTOP_REMOTE_CONTROL === "1") {
+      try {
+        state.remoteControl = new RemoteControlServer({
+          dataDir, bridge: state.agentHostBridge, getHost, invoke: invokeIpc,
+          port: process.env.PI_DESKTOP_REMOTE_PORT === undefined ? undefined : Number(process.env.PI_DESKTOP_REMOTE_PORT),
+          log: (message, error) => logger.app("runtime", "warn", message, { data: String(error) }),
+        });
+        await state.remoteControl.start();
+      } catch (error) {
+        await state.remoteControl?.stop();
+        state.remoteControl = null;
+        logger.app("runtime", "error", "Remote control server failed to start", { data: String(error) });
+      }
+    }
     if (process.env.PI_DESKTOP_MCP_CONTROL === "1") {
       try {
         state.mcpControl = new McpControlServer({

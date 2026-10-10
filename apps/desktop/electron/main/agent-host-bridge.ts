@@ -80,6 +80,7 @@ export const DESKTOP_PRINCIPAL: Principal = {
  */
 export function createAgentHostBridge(options: AgentHostBridgeOptions) {
   const abortingSessions = new Set<string>();
+  const runtimeListeners = new Map<string, Set<(event: AgentEventEnvelope) => void>>();
   const resolvingViaModule = new Set<string>();
 
   /**
@@ -110,13 +111,8 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
         // subject to `remoteMaxPermissionMode: "ask"` should never be able to
         // run a turn at `auto`. Refuse before the sidecar sees the request.
         //
-        // A NARROWER ceiling (or the same mode) is safe to accept: it can only
-        // reduce what the turn is allowed to do. The runtime still uses the
-        // session's stored mode when it enforces tool decisions, so a narrower
-        // request is not yet honoured turn-locally — that is the R1 leftover
-        // waiting on host-core to accept a `permissionMode` override on
-        // `session.beginTurn`. We plumb the parameter end-to-end anyway so the
-        // enforcement gate can flip on without another wire change.
+        // Rust installs the ceiling before runtime dispatch. Always pin remote
+        // turns, even when Ask currently equals the session mode.
         if (
           summary &&
           summary.permissionMode !== request.effectivePermissionMode &&
@@ -134,7 +130,7 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
           );
         }
         const permissionModeOverride =
-          summary && summary.permissionMode !== request.effectivePermissionMode
+          !request.principal.pairedDevice || (summary && summary.permissionMode !== request.effectivePermissionMode)
             ? request.effectivePermissionMode
             : undefined;
         const result = (await options.invoke(options.channels.agentPrompt, [
@@ -146,6 +142,7 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
             ...(request.voiceOrigin ? { voiceOrigin: request.voiceOrigin } : {}),
             ...(request.attachments ? { attachments: request.attachments } : {}),
             ...(permissionModeOverride ? { permissionMode: permissionModeOverride } : {}),
+            ...(request.principal.requireAskSession ? { requiredPermissionMode: "ask" } : {}),
           },
         ])) as { accepted?: boolean; turnId: string };
         return { turnId: result.turnId };
@@ -336,8 +333,28 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
 
   return {
     agentHost,
+    /** Read existing process status only; never construct a runtime or call a model. */
+    async runtimeStatus(): Promise<{ hostReady: boolean; sidecarReady: boolean }> {
+      const host = options.getHost();
+      const [hostReady, sidecarReady] = await Promise.all([
+        host ? host.call<{ ok?: boolean }>("app.health").then(value => value.ok === true).catch(() => false) : false,
+        options.invoke(options.channels.agentGetStatus, ["remote-health-probe"])
+          .then(value => Boolean((value as { status?: { sessionId?: string } } | undefined)?.status?.sessionId === "remote-health-probe"))
+          .catch(() => false),
+      ]);
+      return { hostReady, sidecarReady };
+    },
     observeWorkTarget(sessionId: string): string | null {
       return agentHost.observeWorkTarget(sessionId).activeTurnId;
+    },
+    onRuntimeEvent(sessionId: string, listener: (event: AgentEventEnvelope) => void): () => void {
+      const listeners = runtimeListeners.get(sessionId) ?? new Set();
+      listeners.add(listener);
+      runtimeListeners.set(sessionId, listeners);
+      return () => {
+        listeners.delete(listener);
+        if (!listeners.size) runtimeListeners.delete(sessionId);
+      };
     },
     /**
      * Every interactive request this session is waiting on: the ask questions
@@ -452,6 +469,7 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
       }
       try {
         agentHost.ingest(envelope, { interrupted });
+        for (const listener of runtimeListeners.get(envelope.sessionId) ?? []) listener(envelope);
       } catch (error) {
         options.log("warn", "agent host ingest failed", {
           sessionId: envelope.sessionId,

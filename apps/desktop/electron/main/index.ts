@@ -1031,6 +1031,7 @@ registerShutdownHandlers({
   getHost,
   getSidecar,
   getMcpControl: () => mainState.mcpControl,
+  getRemoteControl: () => mainState.remoteControl,
   activeTurns,
   persistenceOutbox,
   inflightCheckpointer,

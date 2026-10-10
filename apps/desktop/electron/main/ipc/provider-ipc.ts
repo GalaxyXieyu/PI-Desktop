@@ -7,6 +7,7 @@ import {
   type ProviderReorderInput,
   type OAuthRespondInput,
 } from "@pi-desktop/shared";
+import { capabilitiesFromModelConfig, modelConfigWithBinding, visionFromModelConfig } from "@pi-desktop/agent-runtime";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
 import { probeProviderEndpoint } from "../model-discovery";
 import {
@@ -443,6 +444,7 @@ export function registerProviderIpc({
               supportedThinkingLevels: [...(catalogModelConfig.supportedThinkingLevels ?? [])],
               source: model.source ?? ("discovered" as const),
             };
+        const effectiveConfig = modelConfigWithBinding(modelConfig, provider ? bindingForModel(provider, model.modelId) : undefined);
         return {
           ...info,
           // Catalog enrichment must not turn a configured-only row into
@@ -462,6 +464,10 @@ export function registerProviderIpc({
           // ModelInfo is catalog metadata. Keep its published reasoning fields
           // intact; Composer and runtime resolve the exact user binding when
           // they need effective per-provider capabilities.
+          // Effective per-account binding, not a provider-wide or published-only
+          // capability. Remote's cache-only picker uses the same runtime gates.
+          ...capabilitiesFromModelConfig(effectiveConfig),
+          supportsVision: visionFromModelConfig(effectiveConfig),
           ...(modelsDevModel ? { catalogSource: "models.dev" as const } : {}),
         };
       };

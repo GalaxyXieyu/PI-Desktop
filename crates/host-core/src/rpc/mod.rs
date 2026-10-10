@@ -2982,7 +2982,68 @@ async fn handle_request(
                 .get("sessionId")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
-            let st = state.lock().await;
+            let mut st = state.lock().await;
+            let stored = sessions::session_permission_mode(&st.db, session_id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                .ok_or_else(|| rpc_err(1007, "session not found", "SESSION_NOT_FOUND"))?;
+            if let Some(required) = params.get("requiredPermissionMode") {
+                if required != "ask" {
+                    return Err(rpc_err(
+                        1002,
+                        "invalid requiredPermissionMode",
+                        "INVALID_PARAMS",
+                    ));
+                }
+                if stored != "ask" {
+                    return Err(rpc_err(
+                        1008,
+                        "remote commands require an Ask session",
+                        "PERMISSION_MODE_CONFLICT",
+                    ));
+                }
+            }
+            let ceiling = params
+                .get("permissionMode")
+                .map(|value| {
+                    value
+                        .as_str()
+                        .filter(|m| matches!(*m, "ask" | "accept-edits" | "auto"))
+                        .ok_or_else(|| {
+                            rpc_err(1002, "invalid turn permissionMode", "INVALID_PARAMS")
+                        })
+                })
+                .transpose()?;
+            // The restrictive admission guard also pins Ask if a trusted
+            // caller omitted the redundant ceiling field.
+            let ceiling = if params.get("requiredPermissionMode").is_some() {
+                Some("ask")
+            } else {
+                ceiling
+            };
+            let effective = if stored == "inherit" {
+                st.db
+                    .get_setting("app")
+                    .ok()
+                    .flatten()
+                    .and_then(|s| {
+                        s.get("defaultPermissionMode")
+                            .and_then(Value::as_str)
+                            .map(str::to_string)
+                    })
+                    .unwrap_or_else(|| "ask".into())
+            } else {
+                stored
+            };
+            if ceiling.is_some_and(|m| {
+                crate::permissions::permission_rank(m)
+                    > crate::permissions::permission_rank(&effective)
+            }) {
+                return Err(rpc_err(
+                    1008,
+                    "turn ceiling cannot widen session mode",
+                    "PERMISSION_MODE_CONFLICT",
+                ));
+            }
             let provider = params.get("providerId").and_then(Value::as_str);
             let model = params.get("modelId").and_then(Value::as_str);
             let turn_id = match params.get("sessionMessageId").and_then(Value::as_str) {
@@ -2992,6 +3053,8 @@ async fn handle_request(
                 None => sessions::begin_turn(&st.db, session_id, provider, model),
             }
             .map_err(session_collaboration_rpc_err)?;
+            st.permissions
+                .begin_turn_ceiling(session_id, &turn_id, ceiling);
             Ok(json!({ "turnId": turn_id }))
         }
         "session.recordUsage" => {
@@ -3020,7 +3083,7 @@ async fn handle_request(
                 .get("status")
                 .and_then(|v| v.as_str())
                 .unwrap_or("completed");
-            let st = state.lock().await;
+            let mut st = state.lock().await;
             let result = sessions::end_turn_settling(
                 &st.db,
                 turn_id,
@@ -3037,6 +3100,7 @@ async fn handle_request(
                     .unwrap_or(false),
             )
             .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            st.permissions.end_turn_ceiling(turn_id);
             let mut response = json!({ "ok": result.updated });
             if let Some(notification) = result.notification {
                 response["notification"] = json!(notification);
@@ -3412,6 +3476,10 @@ async fn handle_request(
                         }
                         _ => effective_pm,
                     };
+                    let effective_pm = st
+                        .permissions
+                        .clamp_turn_mode(&p.session_id, &effective_pm)
+                        .to_string();
                     // Resolve the tool root from the persisted session instead of
                     // the mutable global workspace. This keeps background turns
                     // isolated when the renderer switches between project tabs.
@@ -3946,6 +4014,10 @@ async fn handle_request(
                         })
                 })
                 .unwrap_or_else(|| "ask".into());
+            let effective_pm = st
+                .permissions
+                .clamp_turn_mode(session_id, &effective_pm)
+                .to_string();
             let args = params.get("args").cloned().unwrap_or_else(|| json!({}));
             let workspace_path = resolve_tool_workspace_for_call(&st, session_id, &args)?;
             let scratch_path = scratch::session_dir(&st.data_dir, session_id);
@@ -9452,5 +9524,108 @@ mod update_settings_tests {
         ] {
             assert!(validate_settings_value(&value).is_err(), "{value}");
         }
+    }
+}
+
+#[cfg(test)]
+mod remote_control_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn remote_turn_admission_and_tool_execution_use_host_ceiling() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut app = AppState::open(dir.path()).unwrap();
+        app.handshook = true;
+        let session = sessions::create_session(
+            &app.db,
+            Some("Remote".into()),
+            Some("agent".into()),
+            None,
+            None,
+            Some(dir.path().to_string_lossy().into_owned()),
+        )
+        .unwrap();
+        app.db
+            .conn()
+            .execute(
+                "UPDATE sessions SET permission_mode='auto' WHERE id=?1",
+                [&session.id],
+            )
+            .unwrap();
+        let state = Arc::new(Mutex::new(app));
+        let params = json!({"sessionId": session.id, "permissionMode": "ask", "requiredPermissionMode": "ask"});
+        let refused = handle_request(
+            state.clone(),
+            "session.beginTurn",
+            params.clone(),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            refused.data.unwrap()["errorCode"],
+            "PERMISSION_MODE_CONFLICT"
+        );
+        state
+            .lock()
+            .await
+            .db
+            .conn()
+            .execute(
+                "UPDATE sessions SET permission_mode='ask' WHERE id=?1",
+                [&session.id],
+            )
+            .unwrap();
+        let turn = handle_request(
+            state.clone(),
+            "session.beginTurn",
+            params,
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        // Simulate a stored-mode change even though today's UI configure gate
+        // blocks it. This catches future settings paths and subagent widening.
+        state
+            .lock()
+            .await
+            .db
+            .conn()
+            .execute(
+                "UPDATE sessions SET permission_mode='auto' WHERE id=?1",
+                [&session.id],
+            )
+            .unwrap();
+        let evaluation = handle_request(
+            state.clone(),
+            "permissions.evaluate",
+            json!({"sessionId":session.id,"toolName":"Write","args":{"path":"remote.txt"}}),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        assert!(evaluation["decision"].is_null());
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let task_state = state.clone();
+        let session_id = session.id.clone();
+        let task = tokio::spawn(async move {
+            handle_request(task_state, "tools.execute", json!({"sessionId":session_id,"turnId":turn["turnId"],"toolCallId":"write","toolName":"Write","permissionScope":"auto","mode":"agent","args":{"path":"remote.txt","content":"must not be written"}}), tx).await
+        });
+        let notification = tokio::time::timeout(std::time::Duration::from_secs(2), rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        let notification: Value = serde_json::from_str(&notification).unwrap();
+        assert_eq!(notification["method"], "permissions.request");
+        handle_request(
+            state.clone(),
+            "permissions.resolve",
+            json!({"requestId":notification["params"]["requestId"],"decision":"deny"}),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(task.await.unwrap().unwrap()["errorCode"], "TOOL_DENIED");
+        assert!(!dir.path().join("remote.txt").exists());
     }
 }

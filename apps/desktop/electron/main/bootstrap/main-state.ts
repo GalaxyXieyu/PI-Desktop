@@ -22,6 +22,7 @@ import type { ShutdownState } from "./shutdown";
 import type { HostProcess } from "../host-process";
 import type { AgentSidecar } from "../agent-sidecar";
 import type { AgentHostBridge } from "../agent-host-bridge";
+import type { RemoteControlServer } from "../remote-control.js";
 import type { McpControlController, McpControlServer } from "../mcp-control";
 import type { BackendRouter } from "../remote/backend-router";
 
@@ -68,6 +69,7 @@ export class MainProcessState {
   host: HostProcess | null = null;
   sidecar: AgentSidecar | null = null;
   mcpControl: McpControlServer | null = null;
+  remoteControl: RemoteControlServer | null = null;
   agentHostBridge: AgentHostBridge | null = null;
   desktopControl: McpControlController | null = null;
   backendRouter: BackendRouter | null = null;
@@ -379,6 +381,8 @@ export class MainProcessState {
       set mcpControl(value) {
         self.mcpControl = value;
       },
+      get remoteControl() { return self.remoteControl; },
+      set remoteControl(value) { self.remoteControl = value; },
     };
 
     this.shutdownState = {

@@ -13828,14 +13828,6 @@ are withdrawn with ADR 0165.
 
 #### E2E-220: Local MCP control drives a running desktop
 
-- **Pending-input extension:** In an isolated fixture session, discover the read
-  operation `agent/pendingInteractive`, read `{ sessionId }`, and verify original
-  question/permission request IDs and details. Resolve through existing confirmed
-  operations, refresh, and verify no stale card remains. Missing session identity
-  fails; native Pi sessions return empty arrays; reads cause no renderer mutation.
-  The HTTP/catalog path is covered by `mcp-control.test.mjs`; real Electron and
-  sidecar approval execution remains a separate acceptance check.
-
 - **Preconditions**: Start PI-Desktop with
   `PI_DESKTOP_MCP_CONTROL=1` and a clean profile. A local project directory is
   available, the Electron user-data directory is writable, and the desktop
@@ -17209,3 +17201,34 @@ progress rendering after approval.
   Playwright can be supplied through `PI_TEST_PLAYWRIGHT`). Only the model server
   is simulated in the Electron flow. The fixture profile and screenshots stay
   under `.artifacts/` for inspection; no user profile or paid model is used.
+
+### Desktop Remote Bridge (pi-remote/1)
+
+- **Preconditions:** An isolated host data directory/project, built candidate
+  host-core and workspace packages, ephemeral loopback HTTP port, no MCP, no
+  real provider credentials. Seed only through local Host RPC, before Desktop
+  opens the same directory.
+- **Actions:** List sessions, page numeric history, connect SSE, submit and
+  retry a UUID command, submit conflicting payloads, stop old/current turns,
+  reconnect while text updates, review exact tool arguments/plan Markdown,
+  answer stale/current permission/Ask/plan cards, and race desktop changes.
+- **Expected:** Snapshot first; original selected-session agent envelopes;
+  pending/status transitions; no doubled deltas/prompts/answers; stale
+  commands conflict; Ask is checked at Rust admission and remains a per-turn
+  ceiling despite mode/subagent/grant changes. Invalid auth/Host/Origin fail;
+  oversized pending data and stream backpressure fail closed; shutdown removes
+  owned discovery and closes subscriptions/connections.
+- **Automation:** `node --test --test-timeout=20000
+  apps/desktop/test/remote-control.test.mjs` uses real isolated Rust state and
+  the existing AgentHost bridge. Runtime dispatch is a test port, not a real
+  model run. `cargo test -p host-core remote_control_tests --offline` exercises
+  actual tool execution, admission and the permission evaluator;
+  `cargo test -p host-core remote_ceiling_tests --offline` covers grant and
+  stale-end isolation. Android/Gateway and full Electron/model acceptance
+  are separate integration gates, not implied by these tests.
+- **Contract:** [desktop-remote-bridge](../03-runtime/desktop-remote-bridge.md).
+- **Production smoke:** `node scripts/e2e-remote-control.mjs` additionally boots
+  real Electron with the seeded isolated data directory and local fake model;
+  asserts one provider request for duplicate UUID submissions, first SSE
+  snapshot, original runtime message updates/final text, and reconnect snapshot
+  content. MCP remains disabled. This is not Android/Gateway acceptance.

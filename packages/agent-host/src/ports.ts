@@ -17,6 +17,8 @@ export type Principal = {
   /** Set when Host policy lets approvers use the session's own mode. */
   approverOverride?: boolean;
   connectionId?: string;
+  /** Trusted adapter policy; never accepted from a remote JSON body. */
+  requireAskSession?: boolean;
 };
 
 export interface Clock {

@@ -153,6 +153,8 @@ type SessionState = {
   activeTurnId?: string;
   turns: Map<string, TurnRecord>;
   activeItems: Map<string, RacpItemSummary>;
+  /** Small runtime transcript tail bridges async persistence at reconnect. */
+  recentMessages: Map<string, UiMessage>;
   pendingInputs: Map<string, { request: RacpInputRequest; original: AskToolRequest }>;
   /** True while at least one remote subscriber is attached. */
   remoteSubscribers: number;
@@ -233,6 +235,19 @@ export class AgentHost {
    */
   ingest(envelope: AgentEventEnvelope, meta: { interrupted?: boolean } = {}): void {
     const state = this.state(envelope.sessionId);
+    if (envelope.event.type === "agent_start" && !envelope.parentToolCallId) state.recentMessages.clear();
+    const messageEvent = envelope.event;
+    if (messageEvent.type === "message_start" || messageEvent.type === "message_end" || messageEvent.type === "message_update") {
+      const message = messageEvent.type === "message_update"
+        ? applyMessageUpdate(state.recentMessages.get(messageEvent.message.id), messageEvent)
+        : messageEvent.message;
+      state.recentMessages.set(message.id, message);
+      while (state.recentMessages.size > this.snapshotItems) state.recentMessages.delete(state.recentMessages.keys().next().value!);
+    }
+    if (messageEvent.type === "user_message_persisted") {
+      state.recentMessages.delete(messageEvent.optimisticMessageId);
+      state.recentMessages.set(messageEvent.message.id, messageEvent.message);
+    }
     const event = envelope.event;
     const turnId = envelope.turnId ? this.resolveTurnId(state, envelope.turnId) : state.activeTurnId;
     const mapping = racpKindForAgentEvent(event.type, { interrupted: meta.interrupted });
@@ -483,6 +498,9 @@ export class AgentHost {
     forceQueue = false,
   ): Promise<StartTurnResult> {
     const summary = await this.requireSession(params.sessionId);
+    if (principal.requireAskSession && summary.permissionMode !== "ask") {
+      throw racpError("CONFLICT", "remote commands require an Ask session");
+    }
     if (
       params.expectedWorkspaceIdentity !== undefined &&
       summary.workspaceIdentity !== params.expectedWorkspaceIdentity
@@ -778,15 +796,24 @@ export class AgentHost {
     }
     if (!found) throw racpError("NOT_FOUND", `input request ${response.inputId} is not open`);
     const { state, entry } = found;
+    // Claim synchronously: concurrent desktop/remote replies cannot dispatch
+    // the same input twice. A failed dispatch is retryable only on this turn.
     if (response.answers.length !== entry.request.questions.length) {
       throw racpError("INVALID_ARGUMENT", "answers must match the number of questions");
     }
-    await this.runtime.respondInput({
-      requestId: entry.original.requestId,
-      sessionId: entry.original.sessionId,
-      answers: response.answers,
-    });
     state.pendingInputs.delete(response.inputId);
+    try {
+      await this.runtime.respondInput({
+        requestId: entry.original.requestId,
+        sessionId: entry.original.sessionId,
+        answers: response.answers,
+      });
+    } catch (error) {
+      if (state.activeTurnId === entry.request.turnId && !state.pendingInputs.has(response.inputId)) {
+        state.pendingInputs.set(response.inputId, entry);
+      }
+      throw error;
+    }
     const turn = state.turns.get(entry.request.turnId);
     if (turn && turn.status === "waiting_input") turn.status = "running";
     this.emit(state, "input.resolved", { inputId: response.inputId, status: "resolved", by: principal.subject }, { turnId: entry.request.turnId });
@@ -842,6 +869,21 @@ export class AgentHost {
       input: entry.request,
       original: entry.original,
     }));
+  }
+
+  /** Synchronous owner view used by the desktop REST/SSE adapter at its cut. */
+  liveSession(sessionId: string) {
+    const state = this.state(sessionId);
+    const turn = state.activeTurnId ? state.turns.get(state.activeTurnId) : undefined;
+    return {
+      messages: [...state.recentMessages.values()],
+      status: {
+        sessionId,
+        isRunning: Boolean(turn && isActive(turn.status)),
+        ...(turn && isActive(turn.status) ? { currentTurnId: turn.runtimeTurnId ?? turn.id } : {}),
+        pendingToolConfirmations: this.approvals.list(sessionId).filter(item => item.kind === "tool").length,
+      },
+    };
   }
 
   /** The RACP view of a session the caller already fetched: its durable summary plus live state. */
@@ -1459,6 +1501,7 @@ export class AgentHost {
         permissionMode: "ask",
         turns: new Map(),
         activeItems: new Map(),
+        recentMessages: new Map(),
         pendingInputs: new Map(),
         remoteSubscribers: 0,
       };
