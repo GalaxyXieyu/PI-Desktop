@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>子任务 · PI-Desktop 交互设计稿</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --surface: #ffffff; --paper: #f9f9f9; --ink: #1a1c1f; --secondary: #5d5d5d;
+      --line: #dedede; --hover: #f3f3f3; --success: #167d43; --error: #b7312c;
+      --warning: #955014; --selected: #ededed; --font: -apple-system, "SF Pro Text", "PingFang SC", "Noto Sans SC", sans-serif;
+      --mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --surface: #181818; --paper: #212121; --ink: #ffffff; --secondary: #afafaf;
+      --line: #414141; --hover: #282828; --success: #40c977; --error: #ff6764;
+      --warning: #ff8549; --selected: #303030;
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; color: var(--ink); background: var(--surface); font: 14px/1.65 var(--font); }
+    button, select { font: inherit; color: inherit; }
+    button { cursor: pointer; background: none; border: 0; }
+    button, summary, select { -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, summary:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; border-radius: 4px; }
+    button:disabled { cursor: default; }
+    ::selection { background: var(--selected); color: var(--ink); }
+    :root { accent-color: var(--ink); scrollbar-color: var(--line) var(--surface); }
+    svg { display: block; width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    p, h1, h2, h3 { margin: 0; }
+    code, time { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .review-header { min-height: 76px; padding: 18px 36px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); }
+    .review-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 12px; }
+    h1 { font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
+    .review-title p, .review-meta { font-size: 12px; color: var(--secondary); }
+    .review-meta { white-space: nowrap; }
+    .controls { max-width: 1064px; margin: 26px auto 0; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+    .scenario-control, .view-controls { display: flex; align-items: center; gap: 10px; }
+    .scenario-control label { font-size: 12px; color: var(--secondary); }
+    select { padding: 7px 30px 7px 12px; border: 0; border-radius: 6px; background: var(--hover); min-height: 36px; }
+    .control { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 7px 10px; min-height: 36px; color: var(--secondary); border-radius: 6px; font-size: 12px; }
+    .control:hover, .control[aria-pressed="true"] { background: var(--hover); color: var(--ink); }
+    .control svg { width: 15px; height: 15px; }
+    .stage { max-width: 1064px; margin: 0 auto; padding: 0 28px; }
+    .workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 36px; }
+    .workspace.has-detail { grid-template-columns: minmax(0, 1fr) 310px; }
+    .conversation { width: 100%; max-width: 808px; min-width: 0; margin: 64px auto 0; container: conversation / inline-size; }
+    .stage[data-narrow="true"] .conversation { max-width: 390px; }
+    .thread-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; color: var(--secondary); font-size: 12px; }
+    .thread-heading svg { width: 16px; height: 16px; }
+    .user-message { width: fit-content; max-width: 88%; margin-left: auto; margin-bottom: 36px; padding: 11px 17px; border-radius: 16px 16px 4px 16px; background: var(--hover); font-size: 14px; line-height: 1.8; }
+    .assistant-copy { font-size: 15px; line-height: 1.9; text-wrap: pretty; }
+    .task-group { margin: 25px 0 23px; }
+    .group-toggle { width: 100%; min-height: 40px; display: flex; align-items: center; gap: 10px; padding: 6px 0; text-align: left; }
+    .group-toggle > svg { color: var(--secondary); width: 17px; height: 17px; }
+    .group-title { font-size: 14px; font-weight: 600; white-space: nowrap; }
+    .group-summary { color: var(--secondary); font-size: 12px; flex: 1; }
+    .group-toggle .chevron { width: 14px; height: 14px; transition: transform 160ms ease-out; }
+    .group-toggle[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+    .group-toggle:hover .group-title { text-decoration: underline; text-underline-offset: 4px; }
+    .group-summary > span { white-space: nowrap; }
+    .task-list { list-style: none; margin: 18px 0 0; padding: 0; display: grid; grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); }
+    .task-item { position: relative; min-width: 0; padding: 12px 14px 0 0; }
+    .task-item::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: var(--line); }
+    .task-item:first-child::before { left: 12px; }
+    .task-item:last-child::before { right: auto; width: 12px; }
+    .task-item::after { content: ""; position: absolute; top: 0; left: 12px; width: 1px; height: 12px; background: var(--line); }
+    .task-item:last-child { padding-right: 0; }
+    .task-button { width: 100%; display: grid; grid-template-columns: 16px minmax(0, 1fr) 12px; column-gap: 10px; row-gap: 7px; padding: 12px 7px 12px 4px; border-radius: 6px; text-align: left; }
+    .task-button:hover, .task-button[aria-expanded="true"] { background: var(--hover); }
+    .task-button > .state-icon { margin-top: 3px; width: 16px; height: 16px; }
+    .task-name { font-size: 14px; line-height: 1.7; font-weight: 550; overflow-wrap: anywhere; }
+    .task-button > .arrow { width: 12px; height: 12px; color: var(--secondary); margin-top: 6px; }
+    .task-meta, .task-activity { grid-column: 2 / 4; color: var(--secondary); min-width: 0; font-size: 12px; }
+    .task-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 7px; }
+    .task-meta time { font-size: 12px; }
+    .task-activity { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .task-activity code { font-size: 12px; }
+    .state-running, .state-creating { color: var(--ink); }
+    .state-completed { color: var(--success); }
+    .state-failed, .state-denied { color: var(--error); }
+    .state-timed_out { color: var(--warning); }
+    .state-stopped, .state-aborted { color: var(--secondary); }
+    .state-running { animation: turn 1.5s linear 2; }
+    @keyframes turn { to { transform: rotate(360deg); } }
+    .task-list.single, .task-list.many { display: block; margin-top: 8px; }
+    .task-list.single .task-item { padding: 0; }
+    .task-list.single .task-item::before, .task-list.single .task-item::after { content: none; }
+    .task-list.single .task-button, .task-list.many .task-button { grid-template-columns: 16px minmax(0, 1fr) auto 12px; align-items: baseline; }
+    .task-list.single .task-button > .state-icon, .task-list.many .task-button > .state-icon { align-self: start; }
+    .task-list.single .task-button > .arrow, .task-list.many .task-button > .arrow { grid-column: 4; grid-row: 1; align-self: center; }
+    .task-list.single .task-meta, .task-list.many .task-meta { grid-column: 3; grid-row: 1; justify-content: flex-end; padding-left: 10px; }
+    .task-list.single .task-activity, .task-list.many .task-activity { grid-column: 2 / 4; }
+    .task-list.many .task-item { padding: 0 0 4px 25px; }
+    .task-list.many .task-item::before { top: 0; bottom: 0; left: 8px; width: 1px; height: auto; }
+    .task-list.many .task-item:last-child::before { bottom: auto; height: 26px; }
+    .task-list.many .task-item::after { top: 25px; left: 8px; width: 13px; height: 1px; }
+    .task-list.single .task-name { font-size: 14px; }
+    .below-copy { margin-top: 4px; }
+    .activity-line { display: flex; align-items: flex-start; gap: 8px; margin-top: 21px; color: var(--secondary); font-size: 12px; }
+    .activity-line svg { width: 15px; height: 15px; margin-top: 3px; }
+    .composer-stub { margin-top: 48px; border-top: 1px solid var(--line); padding: 16px 0; display: flex; justify-content: space-between; gap: 12px; color: var(--secondary); font-size: 12px; }
+    .inspector { min-width: 0; margin-top: 64px; padding: 16px 18px 24px; background: var(--paper); align-self: start; }
+    .inspector-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 23px; }
+    .inspector-header h2 { font-size: 12px; font-weight: 500; color: var(--secondary); }
+    .icon-button { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 5px; }
+    .icon-button:hover { background: var(--hover); }
+    .icon-button svg { width: 16px; height: 16px; }
+    .detail-title { font-size: 18px; font-weight: 600; line-height: 1.7; overflow-wrap: anywhere; }
+    .detail-state { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--secondary); }
+    .detail-state svg { width: 14px; height: 14px; }
+    .detail-meta { display: grid; grid-template-columns: 45px minmax(0, 1fr); gap: 8px 10px; margin: 24px 0; font-size: 12px; }
+    .detail-meta dt { color: var(--secondary); }
+    .detail-meta dd { margin: 0; overflow-wrap: anywhere; }
+    .detail-meta code { font-size: 12px; }
+    .detail-section { margin-top: 24px; }
+    .detail-section h3 { font-size: 12px; font-weight: 600; margin-bottom: 9px; }
+    .detail-section p { font-size: 12px; line-height: 1.9; overflow-wrap: anywhere; color: var(--secondary); }
+    .detail-section.is-error p { color: var(--error); }
+    .steps { list-style: none; padding: 0; margin: 0; }
+    .steps li { display: flex; align-items: flex-start; gap: 9px; padding: 9px 0; font-size: 12px; }
+    .steps svg { width: 13px; height: 13px; margin-top: 4px; }
+    .steps small { display: block; color: var(--secondary); font-size: 12px; overflow-wrap: anywhere; }
+    .review-notes { max-width: 808px; margin: 45px auto 48px; border-top: 1px solid var(--line); padding-top: 16px; }
+    .review-notes > summary { cursor: pointer; width: fit-content; color: var(--secondary); font-size: 12px; }
+    .notes-body { padding-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 25px 36px; }
+    .notes-body h2 { font-size: 14px; font-weight: 600; margin-bottom: 7px; }
+    .notes-body p { color: var(--secondary); font-size: 12px; line-height: 1.9; }
+    .review-footnote { color: var(--secondary); font-size: 12px; margin-top: 22px; }
+    @container conversation (max-width: 580px) {
+      .task-list { display: block; margin-top: 10px; }
+      .task-list .task-item { padding: 0 0 5px 25px; }
+      .task-list .task-item::before { top: 0; bottom: 0; left: 8px; right: auto; width: 1px; height: auto; }
+      .task-list .task-item:last-child::before { bottom: auto; height: 26px; }
+      .task-list .task-item::after { top: 25px; left: 8px; width: 13px; height: 1px; }
+      .task-list.single .task-item { padding: 0; }
+      .task-list .task-button { grid-template-columns: 16px minmax(0, 1fr) 12px; align-items: start; }
+      .task-list .task-button > .arrow { grid-column: 3; grid-row: 1; }
+      .task-list .task-meta { grid-column: 2 / 4; grid-row: auto; justify-content: flex-start; padding-left: 0; }
+      .task-list .task-activity { grid-column: 2 / 4; }
+      .group-toggle { gap: 8px; flex-wrap: wrap; }
+      .group-summary { font-size: 12px; }
+      .assistant-copy { font-size: 14px; }
+    }
+    @media (max-width: 820px) {
+      .workspace.has-detail { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+      .inspector { width: 100%; max-width: 808px; margin: 0 auto; }
+      .stage[data-narrow="true"] .inspector { max-width: 390px; }
+      .review-header { padding: 16px 24px; }
+      .review-meta { display: none; }
+      .conversation { margin-top: 42px; }
+    }
+    @media (max-width: 480px) {
+      .review-header { padding: 15px 20px; }
+      .review-title { gap: 6px 10px; }
+      .controls, .stage { padding-left: 20px; padding-right: 20px; }
+      .controls { margin-top: 18px; gap: 10px; }
+      .scenario-control { width: 100%; justify-content: space-between; }
+      .view-controls { width: 100%; justify-content: flex-end; }
+      .conversation { margin-top: 28px; }
+      .thread-heading { margin-bottom: 22px; }
+      .user-message { margin-bottom: 26px; max-width: 94%; }
+      .notes-body { grid-template-columns: 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+  <!--
+    THESIS: Make delegated work readable inside a conversation without nested cards.
+    CONTEXT: User-approved same-level parallel grouping; existing neutral PI-Desktop tokens.
+    FORM: One open group, fine branching rules, task-first text, stable source ordering.
+    FIRST VIEWPORT: Chat context around three peer tasks; no coordinator tile or model chips.
+    SCOPE: Isolated design proposal, synthetic snapshots only. No runtime or protocol changes.
+    REVIEW: Check single/parallel/terminal states, disclosures, focus, themes and narrow widths.
+  -->
+  <svg aria-hidden="true" style="display:none">
+    <defs>
+      <symbol id="branch" viewBox="0 0 24 24"><path d="M6 3v10a4 4 0 0 0 4 4h7M6 7h11M17 4l3 3-3 3M17 14l3 3-3 3"></path></symbol>
+      <symbol id="chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"></path></symbol>
+      <symbol id="check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></symbol>
+      <symbol id="running" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-8-8" opacity=".3"></path><path d="M12 4a8 8 0 0 1 8 8"></path></symbol>
+      <symbol id="alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 7v6m0 3h.01"></path></symbol>
+      <symbol id="stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"></rect></symbol>
+      <symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 7v5l3 2"></path></symbol>
+      <symbol id="close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"></path></symbol>
+      <symbol id="moon" viewBox="0 0 24 24"><path d="M20 13A8 8 0 0 1 11 4a8 8 0 1 0 9 9Z"></path></symbol>
+      <symbol id="width" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"></rect><path d="M9 3v18"></path></symbol>
+      <symbol id="message" viewBox="0 0 24 24"><path d="M20 15a3 3 0 0 1-3 3H9l-5 3V6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3Z"></path></symbol>
+      <symbol id="terminal" viewBox="0 0 24 24"><path d="m4 5 6 7-6 7m9-1h7"></path></symbol>
+    </defs>
+  </svg>
+  <header class="review-header">
+    <div class="review-title"><h1>子任务，回到对话里。</h1><p>PI-Desktop · 交互设计稿</p></div>
+    <span class="review-meta">设计预览 · 全部内容为模拟数据</span>
+  </header>
+  <div class="controls" aria-label="设计稿预览控制">
+    <div class="scenario-control">
+      <label for="scenario">预览场景</label>
+      <select id="scenario">
+        <option value="single">单个任务</option>
+        <option value="two">两个并行任务</option>
+        <option value="parallel" selected>三个并行任务</option>
+        <option value="many">四个并行任务</option>
+        <option value="completed">全部完成</option>
+        <option value="failed">部分失败，其他继续</option>
+        <option value="terminal">其他结束状态</option>
+        <option value="creating">正在创建</option>
+      </select>
+    </div>
+    <div class="view-controls">
+      <button type="button" class="control" id="narrow-toggle" aria-pressed="false"><svg aria-hidden="true"><use href="#width"></use></svg>窄窗口</button>
+      <button type="button" class="control" id="theme-toggle" aria-pressed="false"><svg aria-hidden="true"><use href="#moon"></use></svg>深色</button>
+    </div>
+  </div>
+  <main class="stage" id="stage" data-narrow="false">
+    <div class="workspace" id="workspace">
+      <article class="conversation" aria-label="聊天中的子任务设计预览" data-screen-label="Subagent activity">
+        <div class="thread-heading"><svg aria-hidden="true"><use href="#message"></use></svg><span>修复连接中断后的任务恢复</span></div>
+        <div class="user-message">连接断开以后，任务还应该继续运行。帮我检查并修复。</div>
+        <p class="assistant-copy" id="intro">我会把连接恢复、运行状态和异常路径分开检查，让三个任务并行推进。</p>
+        <section class="task-group" aria-label="委派任务">
+          <button type="button" class="group-toggle" id="group-toggle" aria-expanded="true" aria-controls="task-list">
+            <svg aria-hidden="true"><use href="#branch"></use></svg>
+            <span class="group-title" id="group-title">并行任务</span>
+            <span class="group-summary" id="group-summary" aria-live="polite"></span>
+            <svg class="chevron" aria-hidden="true"><use href="#chevron"></use></svg>
+          </button>
+          <ul class="task-list" id="task-list" aria-label="同级并行任务"></ul>
+        </section>
+        <p class="assistant-copy below-copy" id="outro">我这边继续处理 HTTP 传输层，保持后台任务的生命周期独立。</p>
+        <div class="activity-line"><svg aria-hidden="true"><use href="#terminal"></use></svg><span id="parent-activity">主任务正在检查连接关闭时的清理逻辑</span></div>
+        <div class="composer-stub"><span>当前展示模拟会话，不会执行真实任务</span><span>Agent</span></div>
+      </article>
+      <aside class="inspector" id="inspector" aria-labelledby="detail-title" hidden>
+        <header class="inspector-header"><h2>任务详情</h2><button type="button" class="icon-button" id="close-detail" aria-label="关闭任务详情"><svg aria-hidden="true"><use href="#close"></use></svg></button></header>
+        <div id="detail-content"></div>
+      </aside>
+    </div>
+    <details class="review-notes">
+      <summary>设计取舍与落地边界</summary>
+      <div class="notes-body">
+        <section><h2>关系保留，卡片去掉</h2><p>一组标题加同级任务，共用一条细分支线。没有外层灰底、主任务大卡片、头像底座和嵌套白卡。线只表示同组分派，不表示先后依赖。</p></section>
+        <section><h2>先读任务，再看身份</h2><p>任务名称是第一层；执行者、真实状态和独立耗时是第二层；最后一行显示最近活动。模型名称、完整任务、步骤与错误原因放进详情。</p></section>
+        <section><h2>横排与窄屏使用同一结构</h2><p>两三个任务在足够宽的对话列中横排；四个任务或对话列不足 580px 时改为同级列表。顺序始终稳定，失败与完成都不触发自动重排。</p></section>
+        <section><h2>完成不等于全部成功</h2><p>已完成、失败、超时、中止、停止和拒绝分别呈现。全部结束也不会自动收起正在阅读的内容。点击组标题可收起，点击任务可查看详情。</p></section>
+        <section><h2>只展示有依据的信息</h2><p>模拟场景明确设定任务并行。正式接入时，仅在分派批次或运行时间能够确认时使用“并行任务”；否则使用“子任务”。不推测依赖、剩余时间、百分比或后续审查节点。</p></section>
+        <section><h2>保持现有详情入口</h2><p>正式界面继续使用工作面板中的子任务标签页。本稿仅模拟单个详情区域，窄屏在下方展示；不引入真实控制操作，也不修改权限、会话或持久化行为。</p></section>
+      </div>
+      <p class="review-footnote">本页是待确认的展示方案，不代表正式界面已更新。预览控制、模拟文案和说明区不会进入产品。</p>
+    </details>
+  </main>
+  <script>
+    const icon = (name, className = "") => `<svg class="${className}" aria-hidden="true"><use href="#${name}"></use></svg>`;
+    const states = {
+      running: { label: "运行中", icon: "running" }, completed: { label: "已完成", icon: "check" },
+      failed: { label: "失败", icon: "alert" }, timed_out: { label: "已超时", icon: "clock" },
+      aborted: { label: "已中止", icon: "stop" }, stopped: { label: "已停止", icon: "stop" },
+      denied: { label: "已拒绝", icon: "alert" }, creating: { label: "正在创建", icon: "clock" },
+    };
+    // All snapshots are authored design fixtures, never real runtime results.
+    const tasks = [
+      { id: "transport", title: "检查连接恢复逻辑", agent: "explorer", state: "running", duration: "4分23秒", iso: "PT4M23S", activity: "读取", target: "transport.ts", steps: 4, model: "gpt-6-astra", brief: "检查连接断开、响应流关闭与后台任务之间的生命周期关系，定位需要修改的路径。", result: "已定位到响应流关闭后的清理分支；正在检查是否误用任务取消信号。" },
+      { id: "runtime", title: "修复运行状态同步", agent: "fixer", state: "running", duration: "3分51秒", iso: "PT3M51S", activity: "编辑", target: "session-runtime.ts", steps: 6, model: "gpt-6-astra", brief: "恢复连接后重新同步任务运行状态，保证断开前后看到的是同一个后台任务。", result: "已调整状态同步入口；正在核对重连后的事件订阅与取消信号。" },
+      { id: "review", title: "检查异常处理边界", agent: "code-reviewer", state: "completed", duration: "2分18秒", iso: "PT2M18S", activity: "已返回", target: "异常路径检查结果", steps: 5, model: "gpt-6-astra", brief: "独立检查当前取消与异常处理流程，列出会导致后台任务被误终止的路径。", result: "已完成异常路径检查。连接结束与任务取消应分开处理，避免共享取消信号。" },
+      { id: "tests", title: "检查现有回归用例覆盖", agent: "test-runner", state: "running", duration: "1分42秒", iso: "PT1M42S", activity: "读取", target: "transport.test.ts", steps: 3, model: "gpt-6-astra", brief: "检查现有测试是否覆盖请求取消、响应流关闭和后台完成三个独立行为。", result: "正在核对现有用例的断言，尚未返回最终报告。" },
+    ];
+    const scenarios = {
+      single: { tasks: [tasks[1]], intro: "我会负责连接恢复，把运行状态同步交给一个独立任务处理。" },
+      two: { tasks: tasks.slice(0, 2), intro: "我会把连接恢复和运行状态拆开，让两个任务并行推进。" },
+      parallel: { tasks: tasks.slice(0, 3), intro: "我会把连接恢复、运行状态和异常路径分开检查，让三个任务并行推进。" },
+      many: { tasks, intro: "连接恢复、运行状态、异常路径和现有用例可以独立检查，四个任务并行推进。" },
+      completed: { tasks: tasks.slice(0, 3).map(task => ({ ...task, state: "completed", activity: "已返回", target: "任务结果", result: task.id === "transport" ? "已定位连接关闭处理中的取消信号耦合，并返回修复建议。" : task.id === "runtime" ? "已完成运行状态同步调整，并返回变更说明。" : task.result })), intro: "三个独立任务已经返回结果，可以展开查看各自的过程。", outro: "结果已收齐。我会继续检查改动之间的一致性，再进行整体验证。", parent: "主任务继续处理，子任务完成不代表整轮任务结束" },
+      failed: { tasks: [tasks[0], { ...tasks[1], state: "failed", activity: "执行失败", target: "查看错误原因", result: "读取目标文件失败，本次任务未完成；其他并行任务仍可继续。", error: "ENOENT：模拟工作区中缺少 session-runtime.ts。请核对工作目录与文件位置后，再决定是否重新委派。" }, tasks[2]], intro: "三个任务分别处理独立范围，其中一个任务遇到错误，其他任务继续运行。" },
+      terminal: { tasks: [
+        { ...tasks[0], state: "timed_out", activity: "任务结束", target: "超过配置的运行时限", result: "运行时限已到，本次任务未成功完成。" },
+        { ...tasks[1], state: "stopped", activity: "任务结束", target: "由主任务主动停止", result: "主任务已停止本次委派，已产生的过程仍可查看。" },
+        { ...tasks[2], state: "denied", activity: "任务结束", target: "所需操作未获授权", result: "操作被拒绝，本次任务没有完成。" },
+        { ...tasks[3], state: "aborted", activity: "任务结束", target: "随所属运行中止", result: "所属运行结束，本次任务已中止，不计为成功。" },
+      ], intro: "以下模拟任务都已结束，但没有成功完成。每一种结束原因都会保留。", outro: "需要先检查各任务的结束原因，再决定下一步。", parent: "历史状态预览 · 无真实任务正在运行" },
+      creating: { tasks: [{ ...tasks[1], state: "creating", duration: "3秒", iso: "PT3S", activity: "等待运行记录", target: "", steps: 0, result: "正在创建委派任务，还没有收到稳定的运行记录。" }], intro: "我会负责连接恢复，运行状态同步任务正在创建。" },
+    };
+    const list = document.getElementById("task-list");
+    const groupToggle = document.getElementById("group-toggle");
+    const inspector = document.getElementById("inspector");
+    const workspace = document.getElementById("workspace");
+    let current = scenarios.parallel;
+    let selectedId = null;
+    function summaryOf(items) {
+      const counts = new Map();
+      for (const item of items) counts.set(item.state, (counts.get(item.state) || 0) + 1);
+      return [...counts].map(([state, count]) => {
+        const emphasis = ["failed", "denied", "timed_out"].includes(state) ? `state-${state}` : "";
+        return `<span class="${emphasis}">${count} ${states[state].label}</span>`;
+      }).join(" · ");
+    }
+    function renderScenario(key) {
+      current = scenarios[key];
+      selectedId = null;
+      inspector.hidden = true;
+      workspace.classList.remove("has-detail");
+      list.hidden = false;
+      groupToggle.setAttribute("aria-expanded", "true");
+      document.getElementById("intro").textContent = current.intro;
+      document.getElementById("outro").textContent = current.outro || "我这边继续处理 HTTP 传输层，保持后台任务的生命周期独立。";
+      document.getElementById("parent-activity").textContent = current.parent || "主任务正在检查连接关闭时的清理逻辑";
+      const count = current.tasks.length;
+      document.getElementById("group-title").textContent = count === 1 ? "子任务" : key === "terminal" ? "子任务记录" : "并行任务";
+      const summary = document.getElementById("group-summary");
+      summary.innerHTML = summaryOf(current.tasks);
+      list.setAttribute("aria-label", count === 1 ? "委派任务" : "同级任务，排列不表示执行顺序");
+      list.className = `task-list ${count === 1 ? "single" : count >= 4 ? "many" : ""}`;
+      list.style.setProperty("--columns", String(count));
+      list.innerHTML = current.tasks.map(task => {
+        const state = states[task.state];
+        return `<li class="task-item"><button type="button" class="task-button" data-task="${task.id}" aria-expanded="false" aria-controls="inspector" aria-label="查看${task.title}，${state.label}的详情">
+          ${icon(state.icon, `state-icon state-${task.state}`)}<span class="task-name">${task.title}</span>${icon("chevron", "arrow")}
+          <span class="task-meta"><span>${task.agent}</span><span aria-hidden="true">·</span><span class="${task.state === "failed" || task.state === "denied" ? `state-${task.state}` : ""}">${state.label}</span><span aria-hidden="true">·</span><time datetime="${task.iso}">${task.duration}</time></span>
+          <span class="task-activity">${task.activity}${task.target ? ` <code>${task.target}</code>` : ""}</span>
+        </button></li>`;
+      }).join("");
+    }
+    function openDetail(id) {
+      const task = current.tasks.find(item => item.id === id);
+      if (!task) return;
+      selectedId = id;
+      const state = states[task.state];
+      const stepLabels = ["读取任务范围与约束", "定位相关实现", "检查取消信号传播", "整理当前发现", "核对异常处理路径", "检查重连状态同步"];
+      const stepMarkup = Array.from({ length: task.steps }, (_, index) => {
+        const lastRunning = task.state === "running" && index === task.steps - 1;
+        const lastFailed = task.state === "failed" && index === task.steps - 1;
+        const symbol = lastRunning ? "running" : lastFailed ? "alert" : "check";
+        return `<li>${icon(symbol, lastRunning ? "state-running" : lastFailed ? "state-failed" : "state-completed")}<span>${stepLabels[index]}<small>${lastRunning ? "进行中" : lastFailed ? "失败，见下方原因" : "已执行"}</small></span></li>`;
+      }).join("");
+      document.getElementById("detail-content").innerHTML = `<h2 class="detail-title" id="detail-title" tabindex="-1">${task.title}</h2>
+        <div class="detail-state">${icon(state.icon, `state-${task.state}`)}<span>${state.label}</span><span>·</span><time datetime="${task.iso}">${task.duration}</time></div>
+        <dl class="detail-meta"><dt>执行者</dt><dd>${task.agent}</dd><dt>模型</dt><dd><code>${task.model}</code></dd><dt>来源</dt><dd>当前主任务</dd></dl>
+        <section class="detail-section"><h3>任务要求</h3><p>${task.brief}</p></section>
+        ${task.steps ? `<section class="detail-section"><h3>执行过程 · ${task.steps} 步</h3><ol class="steps">${stepMarkup}</ol></section>` : ""}
+        <section class="detail-section ${task.error ? "is-error" : ""}"><h3>${task.error ? "失败原因" : task.state === "completed" ? "返回结果" : "当前记录"}</h3><p>${task.error || task.result}</p></section>`;
+      inspector.hidden = false;
+      workspace.classList.add("has-detail");
+      for (const button of list.querySelectorAll("[data-task]")) button.setAttribute("aria-expanded", String(button.dataset.task === id));
+      document.getElementById("detail-title").focus({ preventScroll: true });
+      if (matchMedia("(max-width: 820px)").matches) inspector.scrollIntoView({ block: "start", behavior: "instant" });
+    }
+    function closeDetail() {
+      const previous = selectedId;
+      selectedId = null;
+      inspector.hidden = true;
+      workspace.classList.remove("has-detail");
+      for (const button of list.querySelectorAll("[data-task]")) button.setAttribute("aria-expanded", "false");
+      const trigger = list.querySelector(`[data-task="${previous}"]`);
+      (list.hidden ? groupToggle : trigger || groupToggle).focus();
+    }
+    document.getElementById("scenario").addEventListener("change", event => renderScenario(event.target.value));
+    groupToggle.addEventListener("click", () => { list.hidden = !list.hidden; groupToggle.setAttribute("aria-expanded", String(!list.hidden)); });
+    list.addEventListener("click", event => { const button = event.target.closest("[data-task]"); if (button) openDetail(button.dataset.task); });
+    document.getElementById("close-detail").addEventListener("click", closeDetail);
+    document.addEventListener("keydown", event => { if (event.key === "Escape" && !inspector.hidden) { closeDetail(); event.preventDefault(); } });
+    document.getElementById("narrow-toggle").addEventListener("click", event => {
+      const button = event.currentTarget;
+      const next = button.getAttribute("aria-pressed") !== "true";
+      button.setAttribute("aria-pressed", String(next));
+      document.getElementById("stage").dataset.narrow = String(next);
+    });
+    document.getElementById("theme-toggle").addEventListener("click", event => {
+      const button = event.currentTarget;
+      const next = button.getAttribute("aria-pressed") !== "true";
+      button.setAttribute("aria-pressed", String(next));
+      document.documentElement.dataset.theme = next ? "dark" : "light";
+    });
+    renderScenario("parallel");
+  </script>
+</body>
+</html>

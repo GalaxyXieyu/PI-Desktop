@@ -1,0 +1,19 @@
+{
+  "type": "design",
+  "title": "Subagent activity",
+  "designSystems": [],
+  "primaryDesignSystem": null,
+  "assets": {
+    "Subagent activity": {
+      "versions": [
+        {
+          "path": "index.html",
+          "createdAt": "2026-10-09",
+          "status": "needs-review",
+          "subtitle": "Card-free delegated tasks with peer grouping and independent outcomes",
+          "viewport": { "width": 1280, "height": 900 }
+        }
+      ]
+    }
+  }
+}
